@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Support Chat Interface</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: 'Lato', sans-serif;
+        background-color: #f1f1f1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+      }
+      #connection-container {
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      #transaction-form input {
+        padding: 8px;
+        font-size: 16px;
+        width: 250px;
+        margin-right: 10px;
+      }
+      #transaction-form button {
+        padding: 8px 16px;
+        font-size: 16px;
+        cursor: pointer;
+        background-color: #5865f2;
+        color: white;
+        border: none;
+        border-radius: 5px;
+      }
+      #chat-container {
+        width: 500px;
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        display: none;
+        flex-direction: column;
+      }
+      #chat-header {
+        background-color: #5865f2;
+        color: white;
+        padding: 15px;
+        border-radius: 10px 10px 0 0;
+        text-align: center;
+        font-size: 18px;
+      }
+      #chat-messages {
+        flex: 1;
+        padding: 10px;
+        overflow-y: auto;
+        background: #fafafa;
+      }
+      .message {
+        margin: 10px;
+        padding: 10px 15px;
+        border-radius: 15px;
+        max-width: 70%;
+        word-wrap: break-word;
+        font-size: 15px;
+      }
+      .client {
+        background-color: #e0e0e0;
+        align-self: flex-start;
+      }
+      .support {
+        background-color: #5865f2;
+        color: white;
+        align-self: flex-end;
+      }
+      #chat-input-container {
+        display: flex;
+        border-top: 1px solid #ccc;
+      }
+      #chat-input {
+        flex: 1;
+        border: none;
+        padding: 10px;
+        font-size: 16px;
+        outline: none;
+      }
+      #chat-send {
+        border: none;
+        background-color: #5865f2;
+        color: white;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="connection-container">
+      <form id="transaction-form">
+        <input type="text" id="transaction-id-input" placeholder="Enter Transaction ID" required />
+        <button type="submit">Connect</button>
+      </form>
+    </div>
+    <div id="chat-container">
+      <div id="chat-header">Support Chat <span id="current-tx"></span></div>
+      <div id="chat-messages"></div>
+      <div id="chat-input-container">
+        <input type="text" id="chat-input" placeholder="Type your message..." />
+        <button id="chat-send">Send</button>
+      </div>
+    </div>
+
+    <script>
+      // Create a BroadcastChannel for inter-window communication.
+      const channel = new BroadcastChannel('chat_channel');
+      const transactionForm = document.getElementById('transaction-form');
+      const transactionIdInput = document.getElementById('transaction-id-input');
+      const chatContainer = document.getElementById('chat-container');
+      const currentTxDisplay = document.getElementById('current-tx');
+      const chatMessages = document.getElementById('chat-messages');
+      const chatInput = document.getElementById('chat-input');
+      const chatSend = document.getElementById('chat-send');
+
+      // Current transaction ID that the support agent is connected to.
+      let currentTransactionId = '';
+
+      // Utility to add a message to the chat area.
+      function addMessage(text, sender) {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', sender);
+        messageDiv.textContent = text;
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      // When the support agent submits a transaction ID.
+      transactionForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        currentTransactionId = transactionIdInput.value.trim();
+        if (currentTransactionId !== '') {
+          currentTxDisplay.textContent = "(TX: " + currentTransactionId + ")";
+          chatContainer.style.display = "flex";
+          // Optionally, clear previous messages.
+          chatMessages.innerHTML = "";
+        }
+      });
+
+      // Listen for messages on the BroadcastChannel.
+      channel.onmessage = (e) => {
+        const { sender, text, transactionId } = e.data;
+        // Only process messages that match the current transaction ID.
+        if (sender === 'client' && transactionId === currentTransactionId) {
+          addMessage("Client: " + text, 'client');
+        }
+      };
+
+      // When the support agent sends a message.
+      chatSend.addEventListener('click', () => {
+        const text = chatInput.value.trim();
+        if (text !== '' && currentTransactionId !== '') {
+          addMessage("Support: " + text, 'support');
+          // Broadcast the message with the transaction ID.
+          channel.postMessage({ sender: 'support', text, transactionId: currentTransactionId });
+          chatInput.value = '';
+        }
+      });
+
+      // Allow pressing Enter to send the message.
+      chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          chatSend.click();
+        }
+      });
+    </script>
+  </body>
+</html>

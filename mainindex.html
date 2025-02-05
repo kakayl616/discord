@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#5865f2" />
+    <title>User Information Form</title>
+    <style>
+      /* Global Styles */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: 'Lato', sans-serif;
+      }
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: radial-gradient(circle, #0b0e4d, #020212);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      /* Header */
+      .header {
+        background-color: #2c2f33;
+        padding: 15px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: white;
+        width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+      .header img {
+        height: 24px;
+      }
+      /* Form Container */
+      #form {
+        max-width: 500px;
+        margin-top: 80px;
+        background-color: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        z-index: 1;
+      }
+      h2 {
+        color: #5865f2;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      /* Form Elements */
+      input,
+      select {
+        width: calc(100% - 20px);
+        height: 40px;
+        margin: 10px 0;
+        padding: 0 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 16px;
+      }
+      button {
+        width: 100%;
+        height: 40px;
+        background-color: #5865f2;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button:hover {
+        background-color: #4752c4;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="header">
+      <img
+        src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/6257d23c5fb25be7e0b6e220_Open%20Source%20Projects%20_%20Discord-7.svg"
+        alt="Discord Logo"
+      />
+      <span class="header-title">Help Center</span>
+    </header>
+    <div id="form">
+      <h2>User Information</h2>
+      <form id="userForm">
+        <label for="userID">User ID</label>
+        <input type="text" id="userID" name="userID" required />
+        <label for="type">Type</label>
+        <select name="type" id="type" required>
+          <option value="User" selected>User</option>
+          <option value="Admin">Admin</option>
+          <option value="Moderator">Moderator</option>
+        </select>
+        <label for="accountStatus">Account Status</label>
+        <select id="accountStatus" name="accountStatus" required>
+          <option value="Good">Good</option>
+          <option value="Pending Case">Pending Case</option>
+          <option value="Banned">Banned</option>
+        </select>
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required />
+        <label for="dateCreated">Date Created</label>
+        <input type="text" id="dateCreated" name="dateCreated" required />
+        <label for="activeReports">Active Reports</label>
+        <input type="text" id="activeReports" name="activeReports" required />
+        <label for="profileImage">Profile Image URL</label>
+        <input type="text" id="profileImage" name="profileImage" required />
+        <label for="bannerImage">Banner Image URL</label>
+        <input type="text" id="bannerImage" name="bannerImage" required />
+        <button type="submit">Submit</button>
+      </form>
+    </div>
+    <script>
+      // Generate a unique transaction ID
+      function generateTransactionId() {
+        return 'tx-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      }
+
+      document.getElementById('userForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const data = {};
+        formData.forEach((value, key) => {
+          data[key] = value;
+        });
+        // Compute a CSS class based on the account status
+        const statusClass = data.accountStatus.toLowerCase().replace(' ', '-');
+        // Generate a unique transaction ID for this conversation.
+        const transactionId = generateTransactionId();
+
+        // Build the generated HTML string. The transactionId is hard-coded into the generated page.
+        const generatedHtml = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no" />
+    <title>User Profile</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: 'Lato', sans-serif;
+      }
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: url('img/background.png') no-repeat center center fixed;
+        background-size: cover;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .outer-container {
+        position: relative;
+        top: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 20px;
+        width: 90%;
+        max-width: 1200px;
+        padding: 20px;
+        background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+        border-radius: 30px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        backdrop-filter: blur(20px);
+      }
+      .box-4s {
+        z-index: 3;
+        pointer-events: none;
+        max-width: 14.6875rem;
+        margin-top: -7.3rem;
+        margin-right: -2.5rem;
+        padding-right: 0;
+        position: absolute;
+        top: 0;
+        right: 0;
+      }
+      .left-container {
+        width: 48%;
+        padding: 20px;
+        background: linear-gradient(145deg, #afb5f7 20%, #808aff 80%);
+        border-radius: 20px;
+        backdrop-filter: blur(40px);
+        text-align: center;
+        color: white;
+      }
+      .right-text {
+        width: 48%;
+        padding: 20px;
+        color: white;
+        text-align: left;
+      }
+      .right-text h1,
+      .right-text h2,
+      .right-text h3,
+      .right-text p {
+        margin-bottom: 15px;
+      }
+      .profile-header {
+        position: relative;
+        margin-bottom: 20px;
+        border-radius: 15px 15px 0 0;
+        overflow: hidden;
+      }
+      .profile-header img.banner {
+        display: block;
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+      }
+      .profile-header img.profile {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-top: -40px;
+        border: 3px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .info-container {
+        padding: 20px;
+        text-align: left;
+      }
+      .info-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      .info-row:last-child {
+        border-bottom: none;
+      }
+      .info-row img {
+        width: 16px;
+        height: 16px;
+      }
+      .label {
+        font-weight: bold;
+        color: #5865f2;
+      }
+      .value {
+        color: #23272a;
+      }
+      .good {
+        background-color: rgba(0,128,0,0.2);
+        color: green;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      .pending-case {
+        background-color: rgba(255,165,0,0.2);
+        color: #FFA500;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      .banned {
+        background-color: rgba(255,0,0,0.2);
+        color: red;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      /* Chat Widget Styles */
+      /* No outer background so no extra white space appears */
+      #chat-widget {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        font-family: 'Lato', sans-serif;
+        z-index: 9999;
+      }
+      /* Chat window containing header and body */
+      #chat-window {
+        width: 300px;
+        background-color: #ffffff;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        overflow: hidden;
+        margin-bottom: 5px;
+      }
+      /* Hide chat window when widget is closed */
+      #chat-widget.closed #chat-window {
+        display: none;
+      }
+      /* Chat header */
+      .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #5865f2;
+        color: white;
+        padding: 10px;
+      }
+      .chat-header-info {
+        display: flex;
+        align-items: center;
+      }
+      .chat-logo {
+        width: 30px;
+        height: 30px;
+        margin-right: 10px;
+      }
+      .chat-title {
+        display: flex;
+        flex-direction: column;
+        line-height: 1;
+      }
+      .chat-title-main {
+        font-weight: bold;
+        font-size: 16px;
+      }
+      .chat-title-sub {
+        font-size: 12px;
+      }
+      /* Minimize button */
+      #chat-minimize-btn {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 20px;
+        cursor: pointer;
+      }
+      /* Chat body */
+      .chat-body {
+        background-color: #f1f1f1;
+        max-height: 300px;
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+        overflow-y: auto;
+      }
+      .chat-input-area {
+        display: flex;
+        border-top: 1px solid #ccc;
+      }
+      .chat-input-area input {
+        flex: 1;
+        border: none;
+        padding: 10px;
+        font-size: 14px;
+      }
+      .chat-input-area button {
+        border: none;
+        background-color: #5865f2;
+        color: white;
+        padding: 10px 15px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      /* Chat bubble styles */
+      .chat-messages {
+        display: flex;
+        flex-direction: column;
+      }
+      .chat-bubble {
+        display: inline-block;
+        padding: 8px 12px;
+        border-radius: 15px;
+        margin: 5px;
+        max-width: 80%;
+        word-wrap: break-word;
+      }
+      .chat-bubble.bot {
+        background-color: #e0e0e0;
+        color: #333;
+        align-self: flex-start;
+      }
+      .chat-bubble.user {
+        background-color: #5865f2;
+        color: white;
+        align-self: flex-end;
+      }
+      /* Chat toggle button (always visible) */
+      .chat-toggle {
+        text-align: center;
+        background-color: #5865f2;
+        border-radius: 10px;
+      }
+      .chat-toggle button {
+        background: none;
+        border: none;
+        color: white;
+        width: 100%;
+        padding: 10px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      /* Display the transaction ID in the chat header for reference */
+      .transaction-id {
+        font-size: 10px;
+        opacity: 0.8;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="outer-container">
+      <img
+        src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/6630f482123160b94617877a_Box%20(1).webp"
+        loading="lazy"
+        sizes="(max-width: 479px) 100vw, (max-width: 767px) 188px, (max-width: 991px) 176px, (max-width: 1279px) 235px, 314px"
+        srcset="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/6630f482123160b94617877a_Box%20(1)-p-500.webp 500w, https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/6630f482123160b94617877a_Box%20(1).webp 762w"
+        alt=""
+        class="box-4s"
+      />
+      <div class="left-container">
+        <div class="profile-header">
+          <img class="banner" src="${data.bannerImage}" alt="Banner Image" />
+          <img class="profile" src="${data.profileImage}" alt="${data.username}'s Profile Image" />
+          <h2>${data.username}</h2>
+        </div>
+        <div class="info-container">
+          <div class="info-row">
+            <img src="https://img.icons8.com/ios-filled/50/5865f2/user.png" alt="User Icon" />
+            <span class="label">User ID:</span>
+            <span class="value">${data.userID}</span>
+          </div>
+          <div class="info-row">
+            <img src="https://img.icons8.com/ios-filled/50/5865f2/certificate.png" alt="icon" />
+            <span class="label">Type:</span>
+            <span class="value">${data.type}</span>
+          </div>
+          <div class="info-row">
+            <img src="https://img.icons8.com/ios-filled/50/5865f2/shield.png" alt="icon" />
+            <span class="label">Account Status:</span>
+            <span class="value ${statusClass}">${data.accountStatus}</span>
+          </div>
+          <div class="info-row">
+            <img src="https://img.icons8.com/ios-filled/50/5865f2/calendar.png" alt="icon" />
+            <span class="label">Date Created:</span>
+            <span class="value">${data.dateCreated}</span>
+          </div>
+          <div class="info-row">
+            <img src="https://img.icons8.com/ios-filled/50/5865f2/flag.png" alt="icon" />
+            <span class="label">Active Reports:</span>
+            <span class="value">${data.activeReports}</span>
+          </div>
+        </div>
+      </div>
+      <div class="right-text">
+        <h1>Account Suspension Appeal</h1>
+        <p>If you believe you’ve been falsely accused, you have the opportunity to cancel your pending ban report. Follow the steps below to appeal:</p>
+        <h2>How It Works:</h2>
+        <h3>Step 1: Submit Your Appeal</h3>
+        <p>Provide all necessary details to verify that the report is false.</p>
+        <h3>Step 2: Review Process</h3>
+        <p>Our Report Assistance Team will carefully review your appeal and confirm your information.</p>
+        <h3>Step 3: Report Cancellation</h3>
+        <p>Once your appeal is approved, your pending ban report will be canceled.</p>
+        <h2>Important Notice:</h2>
+        <p>Feature Restrictions: If you do not submit an appeal, you may lose access to certain features such as playing on secured servers, trading items, and using the in-game market.</p>
+        <p>Support Inquiries: Contacting support will not cancel the suspension, as a dedicated team is already handling this matter.</p>
+        <p>Take action now to cancel your pending ban report before it’s finalized!</p>
+      </div>
+    </div>
+    <!-- Chat Widget -->
+    <div id="chat-widget" class="closed">
+      <!-- Chat window (hidden when closed) -->
+      <div id="chat-window">
+        <div class="chat-header">
+          <div class="chat-header-info">
+            <img src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/636e0a6a49cf127bf92de1e2_icon_clyde_blurple_RGB.png" alt="Discord Logo" class="chat-logo" />
+            <div class="chat-title">
+              <div class="chat-title-main">Discord</div>
+              <div class="chat-title-sub">Customer Service</div>
+              <div class="transaction-id">Transaction: ${transactionId}</div>
+            </div>
+          </div>
+          <button id="chat-minimize-btn">–</button>
+        </div>
+        <div class="chat-body">
+          <div class="chat-messages">
+            <div class="chat-bubble bot">Hello! How can we assist you today?</div>
+          </div>
+          <div class="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Type your message..." />
+            <button id="chat-send-btn">Send</button>
+          </div>
+        </div>
+      </div>
+      <!-- Chat toggle (always visible) -->
+      <div class="chat-toggle">
+        <button id="chat-open-btn">Chat</button>
+      </div>
+    </div>
+    <script>
+      (function() {
+        // Create a BroadcastChannel for inter-window communication.
+        const channel = new BroadcastChannel('chat_channel');
+        // Our unique transaction ID for this client.
+        const transactionId = "${transactionId}";
+        const chatWidget = document.getElementById('chat-widget');
+        const chatToggle = document.getElementById('chat-open-btn');
+        const chatMinimize = document.getElementById('chat-minimize-btn');
+        const chatSendBtn = document.getElementById('chat-send-btn');
+        const chatInput = document.getElementById('chat-input');
+        const chatMessages = document.querySelector('.chat-messages');
+
+        // Listen for messages from support that match our transaction ID.
+        channel.onmessage = function(e) {
+          if (e.data.sender === 'support' && e.data.transactionId === transactionId) {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('chat-bubble', 'bot');
+            msgDiv.textContent = e.data.text;
+            chatMessages.appendChild(msgDiv);
+          }
+        };
+
+        // Open chat window when toggle button is clicked.
+        chatToggle.addEventListener('click', function() {
+          chatWidget.classList.remove('closed');
+        });
+
+        // Minimize chat window when minimize button is clicked.
+        chatMinimize.addEventListener('click', function() {
+          chatWidget.classList.add('closed');
+        });
+
+        // Handle sending a message.
+        chatSendBtn.addEventListener('click', function() {
+          const message = chatInput.value.trim();
+          if (message !== '') {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('chat-bubble', 'user');
+            msgDiv.textContent = message;
+            chatMessages.appendChild(msgDiv);
+            chatInput.value = '';
+            // Broadcast the message along with our transaction ID.
+            channel.postMessage({ sender: 'client', text: message, transactionId });
+          }
+        });
+
+        // Allow pressing Enter to send the message.
+        chatInput.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            chatSendBtn.click();
+          }
+        });
+      })();
+    <\/script>
+  </body>
+</html>`;
+        // Open the generated HTML in a new window.
+        const newWindow = window.open('', '_blank');
+        newWindow.document.write(generatedHtml);
+        newWindow.document.close();
+      });
+    </script>
+  </body>
+</html>
