@@ -11,7 +11,8 @@ import {
   addDoc,
   serverTimestamp,
   Timestamp,
-  QuerySnapshot
+  QuerySnapshot,
+  CollectionReference
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
@@ -31,8 +32,8 @@ export default function SupportChat() {
 
   useEffect(() => {
     if (!transactionId) return;
-    // Use a generic to tell Firestore what type of data we expect.
-    const messagesRef = collection<Message>(db, "messages");
+    // Remove the generic parameter and cast to CollectionReference<Message>
+    const messagesRef = collection(db, "messages") as CollectionReference<Message>;
     const q = query(
       messagesRef,
       where("transactionId", "==", transactionId),
