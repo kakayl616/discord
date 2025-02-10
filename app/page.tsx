@@ -1,13 +1,10 @@
-"use client"; // This tells Next.js we need a Client Component
+"use client";
 
 import React, { useState, ChangeEvent, FormEvent } from "react";
-import { useRouter } from "next/navigation"; // App Router
+import { useRouter } from "next/navigation";
 import { db } from "../lib/firebase";
 import { collection, addDoc } from "firebase/firestore";
 
-/** 
- * Define a TypeScript type for our form fields 
- */
 type FormData = {
   userID: string;
   type: string;
@@ -22,7 +19,7 @@ type FormData = {
 export default function HomePage() {
   const router = useRouter();
 
-  // Keep track of form data
+  // --- User Information Form state ---
   const [formValues, setFormValues] = useState<FormData>({
     userID: "",
     type: "User",
@@ -34,8 +31,9 @@ export default function HomePage() {
     bannerImage: "",
   });
 
-  // Handle typing/select changes
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
     setFormValues((prev) => ({
       ...prev,
@@ -43,131 +41,245 @@ export default function HomePage() {
     }));
   };
 
-  // Handle form submission
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      // Add a doc to Firestore "users" collection
       const docRef = await addDoc(collection(db, "users"), {
         ...formValues,
-        createdAt: new Date().toISOString(), // optional
+        createdAt: new Date().toISOString(),
       });
-
-      // Redirect to /[docRef.id]
+      // Redirect to the user profile page (or wherever you need)
       router.push(`/${docRef.id}`);
     } catch (error) {
       console.error("Error saving document:", error);
     }
   };
 
-  // Render the form
+  // --- Support Chat Ticket state ---
+  const [transactionInput, setTransactionInput] = useState("");
+  const [currentTransactionId, setCurrentTransactionId] = useState("");
+
+  const handleTransactionConnect = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = transactionInput.trim();
+    if (trimmed !== "") {
+      setCurrentTransactionId(trimmed);
+    }
+  };
+
+  const handleOpenChatPopup = () => {
+    if (currentTransactionId) {
+      // Open the dynamic support chat page in a new window.
+      window.open(
+        `/support-chat?tx=${currentTransactionId}`,
+        "_blank",
+        "width=600,height=600"
+      );
+    }
+  };
+
   return (
     <div style={pageStyle}>
-      <div style={formContainer}>
-        <h2 style={{ color: "#5865f2", textAlign: "center", marginBottom: "20px" }}>
-          User Information
-        </h2>
+      <div style={containerStyle}>
+        {/* --- Left Column: Support Chat Ticket Form --- */}
+        <div style={leftColumnStyle}>
+          <div style={chatFormContainer}>
+            <h2 style={headingStyle}>Support Chat</h2>
+            <form onSubmit={handleTransactionConnect} style={transactionFormStyle}>
+              <input
+                type="text"
+                value={transactionInput}
+                onChange={(e) => setTransactionInput(e.target.value)}
+                placeholder="Enter Transaction ID"
+                required
+                style={transactionInputStyle}
+              />
+              <button type="submit" style={transactionButtonStyle}>
+                Connect
+              </button>
+            </form>
+            {currentTransactionId && (
+              <div>
+                <p style={infoTextStyle}>
+                  Current Transaction: {currentTransactionId}
+                </p>
+                <button onClick={handleOpenChatPopup} style={transactionButtonStyle}>
+                  Open Chat Ticket
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <label>User ID</label>
-          <input
-            type="text"
-            name="userID"
-            value={formValues.userID}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
+        {/* --- Right Column: User Information Form --- */}
+        <div style={rightColumnStyle}>
+          <div style={formContainer}>
+            <h2 style={{ textAlign: "center", marginBottom: "20px", color: "black" }}>
+              User Information
+            </h2>
+            <form onSubmit={handleSubmit}>
+              <label style={labelStyle}>User ID</label>
+              <input
+                type="text"
+                name="userID"
+                value={formValues.userID}
+                onChange={handleChange}
+                required
+                style={inputStyle}
+              />
 
-          <label>Type</label>
-          <select
-            name="type"
-            value={formValues.type}
-            onChange={handleChange}
-            style={inputStyle}
-          >
-            <option value="User">User</option>
-            <option value="Admin">Admin</option>
-            <option value="Moderator">Moderator</option>
-          </select>
+              <label style={labelStyle}>Type</label>
+              <select
+                name="type"
+                value={formValues.type}
+                onChange={handleChange}
+                style={inputStyle}
+              >
+                <option value="User">User</option>
+                <option value="Admin">Admin</option>
+                <option value="Moderator">Moderator</option>
+              </select>
 
-          <label>Account Status</label>
-          <select
-            name="accountStatus"
-            value={formValues.accountStatus}
-            onChange={handleChange}
-            style={inputStyle}
-          >
-            <option value="Good">Good</option>
-            <option value="Pending Case">Pending Case</option>
-            <option value="Banned">Banned</option>
-          </select>
+              <label style={labelStyle}>Account Status</label>
+              <select
+                name="accountStatus"
+                value={formValues.accountStatus}
+                onChange={handleChange}
+                style={inputStyle}
+              >
+                <option value="Good">Good</option>
+                <option value="Pending Case">Pending Case</option>
+                <option value="Banned">Banned</option>
+              </select>
 
-          <label>Username</label>
-          <input
-            type="text"
-            name="username"
-            value={formValues.username}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
+              <label style={labelStyle}>Username</label>
+              <input
+                type="text"
+                name="username"
+                value={formValues.username}
+                onChange={handleChange}
+                required
+                style={inputStyle}
+              />
 
-          <label>Date Created</label>
-          <input
-            type="text"
-            name="dateCreated"
-            value={formValues.dateCreated}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
+              <label style={labelStyle}>Date Created</label>
+              <input
+                type="text"
+                name="dateCreated"
+                value={formValues.dateCreated}
+                onChange={handleChange}
+                required
+                style={inputStyle}
+              />
 
-          <label>Active Reports</label>
-          <input
-            type="text"
-            name="activeReports"
-            value={formValues.activeReports}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
+              <label style={labelStyle}>Active Reports</label>
+              <input
+                type="text"
+                name="activeReports"
+                value={formValues.activeReports}
+                onChange={handleChange}
+                required
+                style={inputStyle}
+              />
 
-          <label>Profile Image URL</label>
-          <input
-            type="text"
-            name="profileImage"
-            value={formValues.profileImage}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
+              <label style={labelStyle}>Profile Image URL</label>
+              <input
+                type="text"
+                name="profileImage"
+                value={formValues.profileImage}
+                onChange={handleChange}
+                required
+                style={inputStyle}
+              />
 
-          <label>Banner Image URL</label>
-          <input
-            type="text"
-            name="bannerImage"
-            value={formValues.bannerImage}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
+              <label style={labelStyle}>Banner Image URL</label>
+              <input
+                type="text"
+                name="bannerImage"
+                value={formValues.bannerImage}
+                onChange={handleChange}
+                required
+                style={inputStyle}
+              />
 
-          <button type="submit" style={buttonStyle}>
-            Submit
-          </button>
-        </form>
+              <button type="submit" style={buttonStyle}>
+                Submit
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-// Inline styling for demonstration
+/* ----------------------
+   Styling (inline)
+---------------------- */
 const pageStyle: React.CSSProperties = {
   background: "radial-gradient(circle, #0b0e4d, #020212)",
   minHeight: "100vh",
-  padding: "80px 20px",
+  padding: "40px 20px",
   boxSizing: "border-box",
+};
+
+const containerStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "center",
+  gap: "30px",
+};
+
+const leftColumnStyle: React.CSSProperties = {
+  width: "320px", // Fixed width for left column
+};
+
+const rightColumnStyle: React.CSSProperties = {
+  flex: 1,
+  maxWidth: "500px",
+};
+
+const chatFormContainer: React.CSSProperties = {
+  backgroundColor: "#fff",
+  borderRadius: "10px",
+  boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+  padding: "20px",
+  textAlign: "center",
+  width: "300px",       // Fixed width for the support chat box
+  minHeight: "300px",   // Fixed minimum height for the support chat box
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+};
+
+const headingStyle: React.CSSProperties = {
+  color: "black",
+};
+
+const infoTextStyle: React.CSSProperties = {
+  color: "black",
+};
+
+const transactionFormStyle: React.CSSProperties = {
+  marginBottom: "20px",
+};
+
+const transactionInputStyle: React.CSSProperties = {
+  padding: "8px",
+  fontSize: "16px",
+  width: "250px",
+  marginBottom: "10px", // Moves the Connect button lower than the input
+  border: "1px solid black", // Visible border
+  color: "black",
+};
+
+const transactionButtonStyle: React.CSSProperties = {
+  padding: "8px 16px",
+  fontSize: "16px",
+  cursor: "pointer",
+  backgroundColor: "#5865f2",
+  color: "white",
+  border: "none",
+  borderRadius: "5px",
 };
 
 const formContainer: React.CSSProperties = {
@@ -187,6 +299,11 @@ const inputStyle: React.CSSProperties = {
   border: "1px solid #ccc",
   borderRadius: "5px",
   fontSize: "16px",
+  color: "black",
+};
+
+const labelStyle: React.CSSProperties = {
+  color: "black",
 };
 
 const buttonStyle: React.CSSProperties = {

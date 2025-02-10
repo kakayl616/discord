@@ -1,8 +1,8 @@
-// lib/firebase.js
+// lib/firebase.ts
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth, signInAnonymously } from 'firebase/auth';
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCXpiFswNEIe5StLqWBxrteD7Mxjpoj1Z8",
   authDomain: "discordchat-37c86.firebaseapp.com",
@@ -13,12 +13,15 @@ const firebaseConfig = {
   measurementId: "G-KG5766RS6C"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-
-// (Optional) Initialize analytics if you want
-// import { getAnalytics } from 'firebase/analytics';
-// const analytics = getAnalytics(app);
-
-// Initialize Firestore
 export const db = getFirestore(app);
+
+// Set up authentication and sign in anonymously
+const auth = getAuth(app);
+signInAnonymously(auth)
+  .then(() => {
+    console.log("Signed in anonymously");
+  })
+  .catch((error) => {
+    console.error("Anonymous sign-in error:", error);
+  });

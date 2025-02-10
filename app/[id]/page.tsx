@@ -1,12 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-
-
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { db } from "../../lib/firebase"; // your Firestore instance
 import { doc, getDoc } from "firebase/firestore";
 
+// Define your data type
 type UserData = {
   userID: string;
   type: string;
@@ -55,21 +54,36 @@ export default function UserPage() {
     );
   }
 
-  // Determine additional styling for account status based on value
+  // Set up status style with a complementary text color and rounded corners.
   let statusStyle = {};
   const statusLower = data.accountStatus.toLowerCase();
   if (statusLower === "good") {
-    statusStyle = { backgroundColor: "rgba(0, 128, 0, 0.2)", color: "green" };
+    statusStyle = {
+      backgroundColor: "rgba(0, 128, 0, 0.2)",
+      color: "green",
+      borderRadius: "10px",
+      padding: "2px 6px",
+    };
   } else if (statusLower === "pending") {
-    statusStyle = { backgroundColor: "rgba(255, 165, 0, 0.2)", color: "#FFA500" };
+    statusStyle = {
+      backgroundColor: "rgba(255, 165, 0, 0.2)",
+      color: "orange",
+      borderRadius: "10px",
+      padding: "2px 6px",
+    };
   } else if (statusLower === "banned") {
-    statusStyle = { backgroundColor: "rgba(255, 0, 0, 0.2)", color: "red" };
+    statusStyle = {
+      backgroundColor: "rgba(255, 0, 0, 0.2)",
+      color: "red",
+      borderRadius: "10px",
+      padding: "2px 6px",
+    };
   }
 
   return (
     <div style={pageStyle}>
       <div style={outerContainer}>
-        {/* Decorative .box-4s */}
+        {/* Decorative image */}
         <img
           src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/6630f482123160b94617877a_Box%20(1).webp"
           alt=""
@@ -77,7 +91,7 @@ export default function UserPage() {
           loading="lazy"
         />
 
-        {/* Left Container */}
+        {/* Left Container (User's Information) */}
         <div style={leftContainer}>
           <div style={profileHeader}>
             <img
@@ -102,7 +116,16 @@ export default function UserPage() {
                 style={iconStyle}
               />
               <span style={label}>User ID:</span>
-              <span style={value}>{data.userID}</span>
+              <span
+                style={{
+                  ...value,
+                  marginLeft: "auto",
+                  marginRight: "10px",
+                  textAlign: "right",
+                }}
+              >
+                {data.userID}
+              </span>
             </div>
             <div style={infoRow}>
               <img
@@ -111,7 +134,16 @@ export default function UserPage() {
                 style={iconStyle}
               />
               <span style={label}>Type:</span>
-              <span style={value}>{data.type}</span>
+              <span
+                style={{
+                  ...value,
+                  marginLeft: "auto",
+                  marginRight: "10px",
+                  textAlign: "right",
+                }}
+              >
+                {data.type}
+              </span>
             </div>
             <div style={infoRow}>
               <img
@@ -120,7 +152,15 @@ export default function UserPage() {
                 style={iconStyle}
               />
               <span style={label}>Account Status:</span>
-              <span style={{ ...value, ...status, ...statusStyle }}>
+              <span
+                style={{
+                  ...value,
+                  marginLeft: "auto",
+                  marginRight: "10px",
+                  textAlign: "right",
+                  ...statusStyle,
+                }}
+              >
                 {data.accountStatus}
               </span>
             </div>
@@ -131,7 +171,16 @@ export default function UserPage() {
                 style={iconStyle}
               />
               <span style={label}>Date Created:</span>
-              <span style={value}>{data.dateCreated}</span>
+              <span
+                style={{
+                  ...value,
+                  marginLeft: "auto",
+                  marginRight: "10px",
+                  textAlign: "right",
+                }}
+              >
+                {data.dateCreated}
+              </span>
             </div>
             <div style={infoRow}>
               <img
@@ -140,12 +189,25 @@ export default function UserPage() {
                 style={iconStyle}
               />
               <span style={label}>Active Reports:</span>
-              <span style={value}>{data.activeReports}</span>
+              <span
+                style={{
+                  ...value,
+                  marginLeft: "auto",
+                  marginRight: "10px",
+                  textAlign: "right",
+                }}
+              >
+                {data.activeReports}
+              </span>
             </div>
+          </div>
+          {/* Footer with support's ID */}
+          <div style={footerStyle}>
+            <span style={{ fontSize: "14px" }}>💼 SEN - Hudson</span>
           </div>
         </div>
 
-        {/* Right Text */}
+        {/* Right Container (Appeal Information) */}
         <div style={rightText}>
           <h1 style={rightHeading}>Account Suspension Appeal</h1>
           <p style={rightTextP}>
@@ -183,15 +245,12 @@ export default function UserPage() {
           </p>
         </div>
       </div>
-      {/* Chat Widget integrated into the page */}
+      {/* Chat Widget */}
       <ChatWidget />
     </div>
   );
 }
 
-/* ------------------------- */
-/* Chat Widget Component     */
-/* ------------------------- */
 function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<
@@ -208,7 +267,10 @@ function ChatWidget() {
     const channel = new BroadcastChannel("chat_channel");
     channelRef.current = channel;
     channel.onmessage = (e) => {
-      if (e.data.sender === "support" && e.data.transactionId === transactionId) {
+      if (
+        e.data.sender === "support" &&
+        e.data.transactionId === transactionId
+      ) {
         setMessages((prev) => [
           ...prev,
           { text: e.data.text, sender: "bot" },
@@ -239,10 +301,25 @@ function ChatWidget() {
     }
   };
 
+  const handleEmojiClick = () => {
+    setInput((prev) => prev + " 😊");
+  };
+
   return (
     <div style={chatWidgetStyle}>
-      {/* Chat Window */}
-      <div style={{ ...chatWindowStyle, display: isOpen ? "block" : "none" }}>
+      <div
+        style={{
+          ...chatWindowStyle,
+          height: "auto",
+          maxHeight: isOpen ? "450px" : "0px",
+          transition:
+            "max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease",
+          opacity: isOpen ? 1 : 0,
+          transform: isOpen ? "translateY(0)" : "translateY(20px)",
+          pointerEvents: isOpen ? "auto" : "none",
+          overflow: "hidden",
+        }}
+      >
         <div style={chatHeaderStyle}>
           <div style={chatHeaderInfoStyle}>
             <img
@@ -278,6 +355,9 @@ function ChatWidget() {
             ))}
           </div>
           <div style={chatInputAreaStyle}>
+            <button style={chatEmojiBtnStyle} onClick={handleEmojiClick}>
+              😊
+            </button>
             <input
               type="text"
               id="chat-input"
@@ -293,7 +373,6 @@ function ChatWidget() {
           </div>
         </div>
       </div>
-      {/* Chat Toggle Button (always visible) */}
       <div style={chatToggleStyle}>
         <button style={chatToggleBtnStyle} onClick={() => setIsOpen(true)}>
           Chat
@@ -303,14 +382,13 @@ function ChatWidget() {
   );
 }
 
-/* ------------------------- */
 /* Global & Component Styles */
-/* ------------------------- */
 const pageStyle: React.CSSProperties = {
   background: "url('img/background.png') no-repeat center center fixed",
   backgroundSize: "cover",
   minHeight: "100vh",
   display: "flex",
+  flexDirection: "column", // ensures content is stacked vertically
   alignItems: "center",
   justifyContent: "center",
   margin: 0,
@@ -346,7 +424,7 @@ const box4s: React.CSSProperties = {
 };
 
 const leftContainer: React.CSSProperties = {
-  width: "48%",
+  width: "40%",
   padding: "20px",
   background: "linear-gradient(145deg, #afb5f7 20%, #808aff 80%)",
   borderRadius: "20px",
@@ -356,7 +434,7 @@ const leftContainer: React.CSSProperties = {
 };
 
 const rightText: React.CSSProperties = {
-  width: "48%",
+  width: "55%",
   padding: "20px",
   color: "white",
   textAlign: "left",
@@ -365,7 +443,7 @@ const rightText: React.CSSProperties = {
 const profileHeader: React.CSSProperties = {
   position: "relative",
   marginBottom: "20px",
-  borderRadius: "15px 15px 0 0",
+  borderRadius: "20px 20px 0 0",
   overflow: "hidden",
 };
 
@@ -374,6 +452,7 @@ const banner: React.CSSProperties = {
   width: "100%",
   height: "150px",
   objectFit: "cover",
+  borderRadius: "20px 20px 0 0",
 };
 
 const profile: React.CSSProperties = {
@@ -382,6 +461,8 @@ const profile: React.CSSProperties = {
   borderRadius: "50%",
   objectFit: "cover",
   marginTop: "-40px",
+  marginLeft: "auto",
+  marginRight: "auto",
   border: "3px solid white",
   boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
 };
@@ -447,7 +528,7 @@ const rightTextP: React.CSSProperties = {
   lineHeight: 1.5,
 };
 
-/* Chat Widget Styles */
+/* Chat Widget Styles (original colors restored) */
 const chatWidgetStyle: React.CSSProperties = {
   position: "fixed",
   bottom: "20px",
@@ -457,12 +538,10 @@ const chatWidgetStyle: React.CSSProperties = {
 };
 
 const chatWindowStyle: React.CSSProperties = {
-  width: "300px",
   backgroundColor: "#ffffff",
   border: "1px solid #ccc",
   borderRadius: "10px",
   boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
-  overflow: "hidden",
   marginBottom: "5px",
 };
 
@@ -517,7 +596,7 @@ const chatMinimizeBtnStyle: React.CSSProperties = {
 
 const chatBodyStyle: React.CSSProperties = {
   backgroundColor: "#f1f1f1",
-  maxHeight: "300px",
+  maxHeight: "370px",
   display: "flex",
   flexDirection: "column",
   padding: "10px",
@@ -557,6 +636,14 @@ const chatInputAreaStyle: React.CSSProperties = {
   borderTop: "1px solid #ccc",
 };
 
+const chatEmojiBtnStyle: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  fontSize: "20px",
+  cursor: "pointer",
+  marginRight: "5px",
+};
+
 const chatInputStyle: React.CSSProperties = {
   flex: 1,
   border: "none",
@@ -587,4 +674,13 @@ const chatToggleBtnStyle: React.CSSProperties = {
   padding: "10px",
   cursor: "pointer",
   fontSize: "16px",
+};
+
+/* Footer style for the left container */
+const footerStyle: React.CSSProperties = {
+  marginTop: "20px",
+  borderTop: "1px solid rgba(255,255,255,0.3)",
+  paddingTop: "10px",
+  textAlign: "center",
+  fontSize: "14px",
 };
