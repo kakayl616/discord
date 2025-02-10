@@ -48,12 +48,21 @@ export default function HomePage() {
         ...formValues,
         createdAt: new Date().toISOString(),
       });
-      // Redirect to the user profile page (or wherever you need)
-      router.push(`/${docRef.id}`);
+  
+      const userId = docRef.id; // Capture the generated user ID
+  
+      // Open the new user profile page dynamically
+      window.open(`/${userId}`, `UserProfile-${userId}`, "width=800,height=600,scrollbars=yes,resizable=yes");
+  
+      // Automatically set the transaction ID in the chat form
+      setTransactionInput(userId);
+      setCurrentTransactionId(userId);
+  
     } catch (error) {
       console.error("Error saving document:", error);
     }
   };
+  
 
   // --- Support Chat Ticket state ---
   const [transactionInput, setTransactionInput] = useState("");

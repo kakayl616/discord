@@ -26,28 +26,12 @@ type Message = {
 
 export default function SupportChat() {
   const searchParams = useSearchParams();
-  const transactionId = searchParams.get("tx") || "";
+  const transactionId = searchParams.get("tx") || "";  // Get transaction ID from URL
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState("");
 
-  useEffect(() => {
-    if (!transactionId) return;
-    // Remove the generic parameter and cast to CollectionReference<Message>
-    const messagesRef = collection(db, "messages") as CollectionReference<Message>;
-    const q = query(
-      messagesRef,
-      where("transactionId", "==", transactionId),
-      orderBy("timestamp", "asc")
-    );
-    const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<Message>) => {
-      const msgs = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setMessages(msgs);
-    });
-    return () => unsubscribe();
-  }, [transactionId]);
+  const searchParams = useSearchParams();
+  const transactionId = searchParams.get("tx") || "";  // Get transaction ID from URL
 
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
