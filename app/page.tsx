@@ -3,7 +3,7 @@
 import React, { useState, ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "../lib/firebase";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, setDoc, doc } from "firebase/firestore";
 
 type FormData = {
   userID: string;
@@ -44,25 +44,31 @@ export default function HomePage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      const docRef = await addDoc(collection(db, "users"), {
+      // Use setDoc with the provided userID so the document ID matches what you'll query later
+      await setDoc(doc(db, "users", formValues.userID), {
         ...formValues,
         createdAt: new Date().toISOString(),
       });
-  
-      const userId = docRef.id; // Capture the generated user ID
-  
-      // Open the new user profile page dynamically
-      window.open(`/${userId}`, `UserProfile-${userId}`, "width=800,height=600,scrollbars=yes,resizable=yes");
-  
-      // Automatically set the transaction ID in the chat form
+
+      const userId = formValues.userID;
+      console.log("✅ New user created with ID:", userId);
+
+      // Optional: Open a user profile page (adjust as needed)
+      setTimeout(() => {
+        window.open(
+          `/${userId}`,
+          `UserProfile-${userId}`,
+          "width=800,height=600,scrollbars=yes,resizable=yes"
+        );
+      }, 1500);
+
       setTransactionInput(userId);
       setCurrentTransactionId(userId);
-  
+      console.log("🔗 Setting transactionId for chat:", userId);
     } catch (error) {
-      console.error("Error saving document:", error);
+      console.error("🔥 Error saving document:", error);
     }
   };
-  
 
   // --- Support Chat Ticket state ---
   const [transactionInput, setTransactionInput] = useState("");
@@ -239,7 +245,7 @@ const containerStyle: React.CSSProperties = {
 };
 
 const leftColumnStyle: React.CSSProperties = {
-  width: "320px", // Fixed width for left column
+  width: "320px",
 };
 
 const rightColumnStyle: React.CSSProperties = {
@@ -253,8 +259,8 @@ const chatFormContainer: React.CSSProperties = {
   boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
   padding: "20px",
   textAlign: "center",
-  width: "300px",       // Fixed width for the support chat box
-  minHeight: "300px",   // Fixed minimum height for the support chat box
+  width: "300px",
+  minHeight: "300px",
   display: "flex",
   flexDirection: "column",
   justifyContent: "center",
@@ -276,8 +282,8 @@ const transactionInputStyle: React.CSSProperties = {
   padding: "8px",
   fontSize: "16px",
   width: "250px",
-  marginBottom: "10px", // Moves the Connect button lower than the input
-  border: "1px solid black", // Visible border
+  marginBottom: "10px",
+  border: "1px solid black",
   color: "black",
 };
 

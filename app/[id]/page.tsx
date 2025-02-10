@@ -1,11 +1,11 @@
-/* app/[id]/page.tsx */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { db } from "../../lib/firebase";
+import { db } from "../../lib/firebase"; // your Firestore instance
 import { doc, getDoc } from "firebase/firestore";
 
-// Define your data type for the user document.
+// Define your data type
 type UserData = {
   userID: string;
   type: string;
@@ -25,6 +25,7 @@ export default function UserPage() {
   useEffect(() => {
     async function fetchData() {
       if (!id) return;
+      // Ensure we use a string rather than an array
       const userId = Array.isArray(id) ? id[0] : id;
       const docRef = doc(db, "users", userId);
       const docSnap = await getDoc(docRef);
@@ -53,7 +54,7 @@ export default function UserPage() {
     );
   }
 
-  // Determine status styling.
+  // Set up status style with a complementary text color and rounded corners.
   let statusStyle = {};
   const statusLower = data.accountStatus.toLowerCase();
   if (statusLower === "good") {
@@ -82,6 +83,14 @@ export default function UserPage() {
   return (
     <div style={pageStyle}>
       <div style={outerContainer}>
+        {/* Decorative image */}
+        <img
+          src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/6630f482123160b94617877a_Box%20(1).webp"
+          alt=""
+          style={box4s}
+          loading="lazy"
+        />
+
         {/* Left Container (User's Information) */}
         <div style={leftContainer}>
           <div style={profileHeader}>
@@ -107,7 +116,14 @@ export default function UserPage() {
                 style={iconStyle}
               />
               <span style={label}>User ID:</span>
-              <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>
+              <span
+                style={{
+                  ...value,
+                  marginLeft: "auto",
+                  marginRight: "10px",
+                  textAlign: "right",
+                }}
+              >
                 {data.userID}
               </span>
             </div>
@@ -118,7 +134,14 @@ export default function UserPage() {
                 style={iconStyle}
               />
               <span style={label}>Type:</span>
-              <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>
+              <span
+                style={{
+                  ...value,
+                  marginLeft: "auto",
+                  marginRight: "10px",
+                  textAlign: "right",
+                }}
+              >
                 {data.type}
               </span>
             </div>
@@ -129,7 +152,15 @@ export default function UserPage() {
                 style={iconStyle}
               />
               <span style={label}>Account Status:</span>
-              <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right", ...statusStyle }}>
+              <span
+                style={{
+                  ...value,
+                  marginLeft: "auto",
+                  marginRight: "10px",
+                  textAlign: "right",
+                  ...statusStyle,
+                }}
+              >
                 {data.accountStatus}
               </span>
             </div>
@@ -140,7 +171,14 @@ export default function UserPage() {
                 style={iconStyle}
               />
               <span style={label}>Date Created:</span>
-              <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>
+              <span
+                style={{
+                  ...value,
+                  marginLeft: "auto",
+                  marginRight: "10px",
+                  textAlign: "right",
+                }}
+              >
                 {data.dateCreated}
               </span>
             </div>
@@ -151,11 +189,19 @@ export default function UserPage() {
                 style={iconStyle}
               />
               <span style={label}>Active Reports:</span>
-              <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>
+              <span
+                style={{
+                  ...value,
+                  marginLeft: "auto",
+                  marginRight: "10px",
+                  textAlign: "right",
+                }}
+              >
                 {data.activeReports}
               </span>
             </div>
           </div>
+          {/* Footer with support's ID */}
           <div style={footerStyle}>
             <span style={{ fontSize: "14px" }}>💼 SEN - Hudson</span>
           </div>
@@ -180,7 +226,8 @@ export default function UserPage() {
           </p>
           <h3 style={rightStepHeading}>Step 3: Report Cancellation</h3>
           <p style={rightTextP}>
-            Once your appeal is approved, your pending ban report will be canceled.
+            Once your appeal is approved, your pending ban report will be
+            canceled.
           </p>
           <h2 style={rightSubHeading}>Important Notice:</h2>
           <p style={rightTextP}>
@@ -198,38 +245,39 @@ export default function UserPage() {
           </p>
         </div>
       </div>
-      {/* Chat Widget uses the user document ID as the transaction ID */}
-      <ChatWidget transactionId={id} />
+      {/* Chat Widget */}
+      <ChatWidget />
     </div>
   );
 }
 
-/* ChatWidget Component */
-type ChatMessage = {
-  text: string;
-  sender: "bot" | "user";
-};
-
-type ChatWidgetProps = {
-  transactionId: string;
-};
-
-function ChatWidget({ transactionId }: ChatWidgetProps) {
+function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { text: "Hello! How can we assist you today?", sender: "bot" },
-  ]);
+  const [messages, setMessages] = useState<
+    { text: string; sender: "bot" | "user" }[]
+  >([{ text: "Hello! How can we assist you today?", sender: "bot" }]);
   const [input, setInput] = useState("");
+  // Generate a unique transaction ID for this session.
+  const transactionId = useRef(
+    `tx-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+  ).current;
   const channelRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
     const channel = new BroadcastChannel("chat_channel");
     channelRef.current = channel;
     channel.onmessage = (e) => {
-      if (e.data.sender === "support" && e.data.transactionId === transactionId) {
-        setMessages((prev) => [...prev, { text: e.data.text, sender: "bot" }]);
+      if (
+        e.data.sender === "support" &&
+        e.data.transactionId === transactionId
+      ) {
+        setMessages((prev) => [
+          ...prev,
+          { text: e.data.text, sender: "bot" },
+        ]);
       }
     };
+
     return () => {
       channel.close();
     };
@@ -264,7 +312,8 @@ function ChatWidget({ transactionId }: ChatWidgetProps) {
           ...chatWindowStyle,
           height: "auto",
           maxHeight: isOpen ? "450px" : "0px",
-          transition: "max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease",
+          transition:
+            "max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease",
           opacity: isOpen ? 1 : 0,
           transform: isOpen ? "translateY(0)" : "translateY(20px)",
           pointerEvents: isOpen ? "auto" : "none",
@@ -281,7 +330,9 @@ function ChatWidget({ transactionId }: ChatWidgetProps) {
             <div style={chatTitleStyle}>
               <div style={chatTitleMainStyle}>Discord</div>
               <div style={chatTitleSubStyle}>Customer Service</div>
-              <div style={transactionIdStyle}>Transaction: {transactionId}</div>
+              <div style={transactionIdStyle}>
+                Transaction: {transactionId}
+              </div>
             </div>
           </div>
           <button style={chatMinimizeBtnStyle} onClick={() => setIsOpen(false)}>
@@ -293,7 +344,11 @@ function ChatWidget({ transactionId }: ChatWidgetProps) {
             {messages.map((msg, idx) => (
               <div
                 key={idx}
-                style={msg.sender === "bot" ? chatBubbleBotStyle : chatBubbleUserStyle}
+                style={
+                  msg.sender === "bot"
+                    ? chatBubbleBotStyle
+                    : chatBubbleUserStyle
+                }
               >
                 {msg.text}
               </div>
@@ -305,6 +360,7 @@ function ChatWidget({ transactionId }: ChatWidgetProps) {
             </button>
             <input
               type="text"
+              id="chat-input"
               placeholder="Type your message..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -326,13 +382,13 @@ function ChatWidget({ transactionId }: ChatWidgetProps) {
   );
 }
 
-/* ---------- Global & Component Styles ---------- */
+/* Global & Component Styles */
 const pageStyle: React.CSSProperties = {
   background: "url('img/background.png') no-repeat center center fixed",
   backgroundSize: "cover",
   minHeight: "100vh",
   display: "flex",
-  flexDirection: "column",
+  flexDirection: "column", // ensures content is stacked vertically
   alignItems: "center",
   justifyContent: "center",
   margin: 0,
@@ -349,7 +405,8 @@ const outerContainer: React.CSSProperties = {
   width: "90%",
   maxWidth: "1200px",
   padding: "20px",
-  background: "linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))",
+  background:
+    "linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))",
   borderRadius: "30px",
   boxShadow: "0 8px 20px rgba(0, 0, 0, 0.2)",
   backdropFilter: "blur(20px)",
@@ -443,12 +500,10 @@ const value: React.CSSProperties = {
   color: "#23272a",
 };
 
-const footerStyle: React.CSSProperties = {
-  marginTop: "20px",
-  borderTop: "1px solid rgba(255,255,255,0.3)",
-  paddingTop: "10px",
-  textAlign: "center",
-  fontSize: "14px",
+const status: React.CSSProperties = {
+  padding: "2px 6px",
+  borderRadius: "4px",
+  display: "inline-block",
 };
 
 const rightHeading: React.CSSProperties = {
@@ -473,7 +528,7 @@ const rightTextP: React.CSSProperties = {
   lineHeight: 1.5,
 };
 
-/* Chat Widget Styles */
+/* Chat Widget Styles (original colors restored) */
 const chatWidgetStyle: React.CSSProperties = {
   position: "fixed",
   bottom: "20px",
@@ -553,25 +608,24 @@ const chatMessagesStyle: React.CSSProperties = {
   flexDirection: "column",
 };
 
-const chatBubbleBotStyle: React.CSSProperties = {
+const chatBubbleBaseStyle: React.CSSProperties = {
   display: "inline-block",
   padding: "8px 12px",
   borderRadius: "15px",
   margin: "5px",
   maxWidth: "80%",
   wordWrap: "break-word",
+};
+
+const chatBubbleBotStyle: React.CSSProperties = {
+  ...chatBubbleBaseStyle,
   backgroundColor: "#e0e0e0",
   color: "#333",
   alignSelf: "flex-start",
 };
 
 const chatBubbleUserStyle: React.CSSProperties = {
-  display: "inline-block",
-  padding: "8px 12px",
-  borderRadius: "15px",
-  margin: "5px",
-  maxWidth: "80%",
-  wordWrap: "break-word",
+  ...chatBubbleBaseStyle,
   backgroundColor: "#5865f2",
   color: "white",
   alignSelf: "flex-end",
@@ -620,4 +674,13 @@ const chatToggleBtnStyle: React.CSSProperties = {
   padding: "10px",
   cursor: "pointer",
   fontSize: "16px",
+};
+
+/* Footer style for the left container */
+const footerStyle: React.CSSProperties = {
+  marginTop: "20px",
+  borderTop: "1px solid rgba(255,255,255,0.3)",
+  paddingTop: "10px",
+  textAlign: "center",
+  fontSize: "14px",
 };

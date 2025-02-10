@@ -12,7 +12,9 @@ import {
   serverTimestamp,
   Timestamp,
   QuerySnapshot,
-  CollectionReference
+  CollectionReference,
+  doc,
+  getDoc
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
@@ -24,37 +26,122 @@ type Message = {
   transactionId: string;
 };
 
+type UserData = {
+  userID: string;
+  username: string;
+};
+
 export default function SupportChat() {
   const searchParams = useSearchParams();
-  const transactionId = searchParams.get("tx") || "";  // Get transaction ID from URL
+  const transactionId = searchParams.get("tx") || "";
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState("");
+  const [user, setUser] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const searchParams = useSearchParams();
-  const transactionId = searchParams.get("tx") || "";  // Get transaction ID from URL
+  // Log the transaction ID for debugging
+  useEffect(() => {
+    console.log("🔍 Support Chat Transaction ID:", transactionId);
+  }, [transactionId]);
 
+  // Fetch User Data using the transactionId as the document ID
+  useEffect(() => {
+    async function fetchUserData() {
+      if (!transactionId) {
+        console.error("🚨 No transactionId provided!");
+        setLoading(false);
+        return;
+      }
+
+      console.log("🔍 Fetching user data for transaction ID:", transactionId);
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", transactionId));
+
+        if (userDoc.exists()) {
+          console.log("✅ User found:", userDoc.data());
+          setUser(userDoc.data() as UserData);
+        } else {
+          console.error("❌ User not found in Firestore!");
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("🔥 Firestore error fetching user data:", error);
+      }
+
+      setLoading(false);
+    }
+
+    fetchUserData();
+  }, [transactionId]);
+
+  // Fetch Messages for the given transactionId
+  useEffect(() => {
+    if (!transactionId) return;
+
+    console.log("🔍 Fetching messages for transaction ID:", transactionId);
+
+    const messagesRef = collection(db, "messages") as CollectionReference<Message>;
+    const q = query(
+      messagesRef,
+      where("transactionId", "==", transactionId),
+      orderBy("timestamp", "asc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<Message>) => {
+      const msgs = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      console.log("✅ Fetched Messages:", msgs);
+      setMessages(msgs);
+    });
+
+    return () => unsubscribe();
+  }, [transactionId]);
+
+  // Handle sending a message from support
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = chatInput.trim();
     if (!trimmed) return;
+
     try {
       await addDoc(collection(db, "messages"), {
-        transactionId,
+        transactionId, // Link to the user by transaction ID
         sender: "support",
         text: trimmed,
         timestamp: serverTimestamp(),
       });
+
       setChatInput("");
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("🔥 Error sending message:", error);
     }
   };
+
+  // Display loading or error messages as needed
+  if (loading) {
+    return (
+      <h2 style={{ color: "black", textAlign: "center", marginTop: "50px" }}>
+        Loading...
+      </h2>
+    );
+  }
+
+  if (!user) {
+    return (
+      <h2 style={{ color: "red", textAlign: "center", marginTop: "50px" }}>
+        ❌ User Not Found!
+      </h2>
+    );
+  }
 
   return (
     <div style={chatPageStyle}>
       <div style={chatContainerStyle}>
         <div style={chatHeaderStyle}>
-          Support Chat (TX: {transactionId})
+          Support Chat - {user.username} (TX: {transactionId})
         </div>
         <div style={chatMessagesStyle}>
           {messages.map((msg) => (
