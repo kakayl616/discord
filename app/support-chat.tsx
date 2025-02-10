@@ -10,6 +10,8 @@ import {
   onSnapshot,
   addDoc,
   serverTimestamp,
+  Timestamp,
+  QuerySnapshot
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
@@ -17,7 +19,7 @@ type Message = {
   id?: string;
   sender: string;
   text: string;
-  timestamp?: any;
+  timestamp?: Timestamp;
   transactionId: string;
 };
 
@@ -29,17 +31,18 @@ export default function SupportChat() {
 
   useEffect(() => {
     if (!transactionId) return;
-    const messagesRef = collection(db, "messages");
+    // Use a generic to tell Firestore what type of data we expect.
+    const messagesRef = collection<Message>(db, "messages");
     const q = query(
       messagesRef,
       where("transactionId", "==", transactionId),
       orderBy("timestamp", "asc")
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<Message>) => {
       const msgs = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-      })) as Message[];
+      }));
       setMessages(msgs);
     });
     return () => unsubscribe();
