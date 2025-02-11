@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, ChangeEvent, FormEvent } from "react";
+import React, {
+  useState,
+  useEffect,
+  ChangeEvent,
+  FormEvent,
+  useRef,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import {
   collection,
@@ -14,72 +20,108 @@ import {
   QuerySnapshot,
   CollectionReference,
   doc,
-  getDoc
+  getDoc,
 } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { db } from "@/lib/firebase";
 
+// Message type for chat messages
 type Message = {
   id?: string;
-  sender: string;
+  sender: string; // "support" or "client"
   text: string;
   timestamp?: Timestamp;
   transactionId: string;
 };
 
+// User data type from the user information form
 type UserData = {
   userID: string;
   username: string;
 };
 
+interface TransactionFormProps {
+  onSubmit: (tx: string) => void;
+}
+
+function TransactionForm({ onSubmit }: TransactionFormProps) {
+  const [input, setInput] = useState("");
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = input.trim();
+    if (trimmed !== "") {
+      onSubmit(trimmed);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      style={{ textAlign: "center", marginTop: "50px" }}
+    >
+      <h2>Please enter a valid transaction ID:</h2>
+      <input
+        type="text"
+        value={input}
+        onChange={(e: ChangeEvent<HTMLInputElement>) =>
+          setInput(e.target.value)
+        }
+        placeholder="Enter Transaction ID"
+        style={{ padding: "10px", fontSize: "16px" }}
+      />
+      <button
+        type="submit"
+        style={{ padding: "10px 20px", marginLeft: "10px" }}
+      >
+        Submit
+      </button>
+    </form>
+  );
+}
+
 export default function SupportChat() {
   const searchParams = useSearchParams();
-  const transactionId = searchParams.get("tx") || "";
+  const initialTx = searchParams.get("tx") || "";
+  const [transactionId, setTransactionId] = useState(initialTx);
+
+  // If the transactionId is missing or equals "support-chat", prompt for a valid one.
+  if (!transactionId || transactionId === "support-chat") {
+    return <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />;
+  }
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Log the transaction ID for debugging
-  useEffect(() => {
-    console.log("🔍 Support Chat Transaction ID:", transactionId);
-  }, [transactionId]);
+  // A ref to auto-scroll to the bottom
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Fetch User Data using the transactionId as the document ID
+  // Fetch user data (optional, for displaying username)
   useEffect(() => {
     async function fetchUserData() {
       if (!transactionId) {
-        console.error("🚨 No transactionId provided!");
         setLoading(false);
         return;
       }
-
-      console.log("🔍 Fetching user data for transaction ID:", transactionId);
-
       try {
         const userDoc = await getDoc(doc(db, "users", transactionId));
-
         if (userDoc.exists()) {
-          console.log("✅ User found:", userDoc.data());
           setUser(userDoc.data() as UserData);
         } else {
-          console.error("❌ User not found in Firestore!");
           setUser(null);
         }
       } catch (error) {
-        console.error("🔥 Firestore error fetching user data:", error);
+        console.error("Error fetching user data:", error);
       }
-
       setLoading(false);
     }
-
     fetchUserData();
   }, [transactionId]);
 
-  // Fetch Messages for the given transactionId
+  // Listen for chat messages in Firestore
   useEffect(() => {
     if (!transactionId) return;
-
-    console.log("🔍 Fetching messages for transaction ID:", transactionId);
 
     const messagesRef = collection(db, "messages") as CollectionReference<Message>;
     const q = query(
@@ -93,34 +135,36 @@ export default function SupportChat() {
         id: doc.id,
         ...doc.data(),
       }));
-      console.log("✅ Fetched Messages:", msgs);
       setMessages(msgs);
     });
 
     return () => unsubscribe();
   }, [transactionId]);
 
-  // Handle sending a message from support
+  // Auto-scroll to bottom whenever messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = chatInput.trim();
     if (!trimmed) return;
-
     try {
       await addDoc(collection(db, "messages"), {
-        transactionId, // Link to the user by transaction ID
+        transactionId,
         sender: "support",
         text: trimmed,
         timestamp: serverTimestamp(),
       });
-
       setChatInput("");
     } catch (error) {
-      console.error("🔥 Error sending message:", error);
+      console.error("Error sending message:", error);
     }
   };
 
-  // Display loading or error messages as needed
   if (loading) {
     return (
       <h2 style={{ color: "black", textAlign: "center", marginTop: "50px" }}>
@@ -129,34 +173,28 @@ export default function SupportChat() {
     );
   }
 
-  if (!user) {
-    return (
-      <h2 style={{ color: "red", textAlign: "center", marginTop: "50px" }}>
-        ❌ User Not Found!
-      </h2>
-    );
-  }
-
   return (
     <div style={chatPageStyle}>
       <div style={chatContainerStyle}>
         <div style={chatHeaderStyle}>
-          Support Chat - {user.username} (TX: {transactionId})
+          Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
         </div>
+        {/* Messages area (scrollable) */}
         <div style={chatMessagesStyle}>
           {messages.map((msg) => (
             <div
               key={msg.id}
               style={
-                msg.sender === "support"
-                  ? supportMessageStyle
-                  : clientMessageStyle
+                msg.sender === "support" ? supportMessageStyle : clientMessageStyle
               }
             >
               {msg.sender}: {msg.text}
             </div>
           ))}
+          {/* A dummy div to anchor auto-scroll */}
+          <div ref={messagesEndRef} />
         </div>
+        {/* Input area */}
         <form onSubmit={handleSend} style={chatInputContainerStyle}>
           <input
             type="text"
@@ -177,7 +215,7 @@ export default function SupportChat() {
 }
 
 /* ----------------------
-   Styling (inline)
+   Styling
 ---------------------- */
 const chatPageStyle: React.CSSProperties = {
   margin: 0,
@@ -189,14 +227,25 @@ const chatPageStyle: React.CSSProperties = {
   height: "100vh",
 };
 
+/**
+ * 
+ *  1) We set a FIXED width & height so it DOES NOT EXPAND
+ *  2) display flex column
+ *  3) overflow hidden ensures the container won't grow
+ */
 const chatContainerStyle: React.CSSProperties = {
   width: "500px",
+  height: "600px", // FIXED height - no expansion
   backgroundColor: "white",
   border: "1px solid #ccc",
   borderRadius: "10px",
   boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+
   display: "flex",
   flexDirection: "column",
+
+  // Do not let it expand beyond 600px:
+  overflow: "hidden",
 };
 
 const chatHeaderStyle: React.CSSProperties = {
@@ -208,6 +257,11 @@ const chatHeaderStyle: React.CSSProperties = {
   fontSize: "18px",
 };
 
+/**
+ * 
+ *  1) flex: 1 => takes remaining space
+ *  2) overflowY: auto => scrollable inside this area
+ */
 const chatMessagesStyle: React.CSSProperties = {
   flex: 1,
   padding: "10px",

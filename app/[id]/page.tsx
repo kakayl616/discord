@@ -1,11 +1,30 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  ChangeEvent,
+  FormEvent,
+} from "react";
 import { useParams } from "next/navigation";
 import { db } from "../../lib/firebase"; // your Firestore instance
-import { doc, getDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  addDoc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  serverTimestamp,
+  CollectionReference,
+  QuerySnapshot,
+} from "firebase/firestore";
 
-// Define your data type
+// ------------ 1) FIRESTORE DATA TYPES --------------
 type UserData = {
   userID: string;
   type: string;
@@ -17,6 +36,16 @@ type UserData = {
   bannerImage: string;
 };
 
+// For the chat messages in Firestore
+type ChatMessage = {
+  id?: string;
+  sender: "client" | "support";
+  text: string;
+  timestamp?: any; // Firestore timestamp
+  transactionId: string;
+};
+
+// ------------ 2) MAIN USER PAGE COMPONENT --------------
 export default function UserPage() {
   const { id } = useParams();
   const [data, setData] = useState<UserData | null>(null);
@@ -24,18 +53,33 @@ export default function UserPage() {
 
   useEffect(() => {
     async function fetchData() {
-      if (!id) return;
+      if (!id) {
+        console.error("🚨 No ID provided in the URL parameters.");
+        setLoading(false);
+        return;
+      }
       // Ensure we use a string rather than an array
       const userId = Array.isArray(id) ? id[0] : id;
-      const docRef = doc(db, "users", userId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setData(docSnap.data() as UserData);
-      } else {
+      console.log("🔍 Fetching user document for ID:", userId);
+
+      try {
+        const docRef = doc(db, "users", userId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          console.log("✅ Document data:", docSnap.data());
+          setData(docSnap.data() as UserData);
+        } else {
+          console.error("❌ No document found for ID:", userId);
+          setData(null);
+        }
+      } catch (error) {
+        console.error("🔥 Error fetching document:", error);
         setData(null);
       }
       setLoading(false);
     }
+
     fetchData();
   }, [id]);
 
@@ -46,254 +90,273 @@ export default function UserPage() {
       </h2>
     );
   }
-  if (!data) {
-    return (
-      <h2 style={{ color: "red", textAlign: "center", marginTop: "50px" }}>
-        User not found!
-      </h2>
-    );
-  }
 
-  // Set up status style with a complementary text color and rounded corners.
-  let statusStyle = {};
-  const statusLower = data.accountStatus.toLowerCase();
+  return (
+    <div style={pageStyle}>
+      {data ? (
+        <div style={outerContainer}>
+          {/* Decorative image */}
+          <img
+            src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/6630f482123160b94617877a_Box%20(1).webp"
+            alt=""
+            style={box4s}
+            loading="lazy"
+          />
+
+          {/* Left Container (User's Information) */}
+          <div style={leftContainer}>
+            <div style={profileHeader}>
+              <img
+                className="banner"
+                src={data.bannerImage}
+                alt="Banner Image"
+                style={banner}
+              />
+              <img
+                className="profile"
+                src={data.profileImage}
+                alt={`${data.username}'s Profile Image`}
+                style={profile}
+              />
+              <h2 style={username}>{data.username}</h2>
+            </div>
+            <div style={infoContainer}>
+              <div style={infoRow}>
+                <img
+                  src="https://img.icons8.com/ios-filled/50/5865f2/user.png"
+                  alt="User Icon"
+                  style={iconStyle}
+                />
+                <span style={label}>User ID:</span>
+                <span
+                  style={{
+                    ...value,
+                    marginLeft: "auto",
+                    marginRight: "10px",
+                    textAlign: "right",
+                  }}
+                >
+                  {data.userID}
+                </span>
+              </div>
+              <div style={infoRow}>
+                <img
+                  src="https://img.icons8.com/ios-filled/50/5865f2/certificate.png"
+                  alt="Type Icon"
+                  style={iconStyle}
+                />
+                <span style={label}>Type:</span>
+                <span
+                  style={{
+                    ...value,
+                    marginLeft: "auto",
+                    marginRight: "10px",
+                    textAlign: "right",
+                  }}
+                >
+                  {data.type}
+                </span>
+              </div>
+              <div style={infoRow}>
+                <img
+                  src="https://img.icons8.com/ios-filled/50/5865f2/shield.png"
+                  alt="Shield Icon"
+                  style={iconStyle}
+                />
+                <span style={label}>Account Status:</span>
+                <span
+                  style={{
+                    ...value,
+                    marginLeft: "auto",
+                    marginRight: "10px",
+                    textAlign: "right",
+                    ...getStatusStyle(data.accountStatus),
+                  }}
+                >
+                  {data.accountStatus}
+                </span>
+              </div>
+              <div style={infoRow}>
+                <img
+                  src="https://img.icons8.com/ios-filled/50/5865f2/calendar.png"
+                  alt="Calendar Icon"
+                  style={iconStyle}
+                />
+                <span style={label}>Date Created:</span>
+                <span
+                  style={{
+                    ...value,
+                    marginLeft: "auto",
+                    marginRight: "10px",
+                    textAlign: "right",
+                  }}
+                >
+                  {data.dateCreated}
+                </span>
+              </div>
+              <div style={infoRow}>
+                <img
+                  src="https://img.icons8.com/ios-filled/50/5865f2/flag.png"
+                  alt="Flag Icon"
+                  style={iconStyle}
+                />
+                <span style={label}>Active Reports:</span>
+                <span
+                  style={{
+                    ...value,
+                    marginLeft: "auto",
+                    marginRight: "10px",
+                    textAlign: "right",
+                  }}
+                >
+                  {data.activeReports}
+                </span>
+              </div>
+            </div>
+            {/* Footer with support's ID */}
+            <div style={footerStyle}>
+              <span style={{ fontSize: "14px" }}>💼 SEN - Hudson</span>
+            </div>
+          </div>
+
+          {/* Right Container (Appeal Information) */}
+          <div style={rightText}>
+            <h1 style={rightHeading}>Account Suspension Appeal</h1>
+            <p style={rightTextP}>
+              If you believe you’ve been falsely accused, you have the opportunity
+              to cancel your pending ban report. Follow the steps below to appeal:
+            </p>
+            <h2 style={rightSubHeading}>How It Works:</h2>
+            <h3 style={rightStepHeading}>Step 1: Submit Your Appeal</h3>
+            <p style={rightTextP}>
+              Provide all necessary details to verify that the report is false.
+            </p>
+            <h3 style={rightStepHeading}>Step 2: Review Process</h3>
+            <p style={rightTextP}>
+              Our Report Assistance Team will carefully review your appeal and
+              confirm your information.
+            </p>
+            <h3 style={rightStepHeading}>Step 3: Report Cancellation</h3>
+            <p style={rightTextP}>
+              Once your appeal is approved, your pending ban report will be
+              canceled.
+            </p>
+            <h2 style={rightSubHeading}>Important Notice:</h2>
+            <p style={rightTextP}>
+              Feature Restrictions: If you do not submit an appeal, you may lose
+              access to certain features such as playing on secured servers,
+              trading items, and using the in-game market.
+            </p>
+            <p style={rightTextP}>
+              Support Inquiries: Contacting support will not cancel the suspension,
+              as a dedicated team is already handling this matter.
+            </p>
+            <p style={rightTextP}>
+              Take action now to cancel your pending ban report before it’s
+              finalized!
+            </p>
+          </div>
+        </div>
+      ) : (
+        <h2 style={{ color: "red", textAlign: "center", marginTop: "50px" }}>
+          User not found!
+        </h2>
+      )}
+
+      {/* Chat Widget always rendered, but only works if we have a valid user */}
+      {data && <ChatWidget userID={data.userID} />}
+    </div>
+  );
+}
+
+// ------------ 3) STYLING HELPERS + STATUS FUNCTION --------------
+function getStatusStyle(accountStatus: string) {
+  const statusLower = accountStatus.toLowerCase();
   if (statusLower === "good") {
-    statusStyle = {
+    return {
       backgroundColor: "rgba(0, 128, 0, 0.2)",
       color: "green",
       borderRadius: "10px",
       padding: "2px 6px",
     };
-  } else if (statusLower === "pending") {
-    statusStyle = {
+  } else if (statusLower.includes("pending")) {
+    // Some folks name it "Pending Case" or just "Pending"
+    return {
       backgroundColor: "rgba(255, 165, 0, 0.2)",
       color: "orange",
       borderRadius: "10px",
       padding: "2px 6px",
     };
   } else if (statusLower === "banned") {
-    statusStyle = {
+    return {
       backgroundColor: "rgba(255, 0, 0, 0.2)",
       color: "red",
       borderRadius: "10px",
       padding: "2px 6px",
     };
   }
-
-  return (
-    <div style={pageStyle}>
-      <div style={outerContainer}>
-        {/* Decorative image */}
-        <img
-          src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/6630f482123160b94617877a_Box%20(1).webp"
-          alt=""
-          style={box4s}
-          loading="lazy"
-        />
-
-        {/* Left Container (User's Information) */}
-        <div style={leftContainer}>
-          <div style={profileHeader}>
-            <img
-              className="banner"
-              src={data.bannerImage}
-              alt="Banner Image"
-              style={banner}
-            />
-            <img
-              className="profile"
-              src={data.profileImage}
-              alt={`${data.username}'s Profile Image`}
-              style={profile}
-            />
-            <h2 style={username}>{data.username}</h2>
-          </div>
-          <div style={infoContainer}>
-            <div style={infoRow}>
-              <img
-                src="https://img.icons8.com/ios-filled/50/5865f2/user.png"
-                alt="User Icon"
-                style={iconStyle}
-              />
-              <span style={label}>User ID:</span>
-              <span
-                style={{
-                  ...value,
-                  marginLeft: "auto",
-                  marginRight: "10px",
-                  textAlign: "right",
-                }}
-              >
-                {data.userID}
-              </span>
-            </div>
-            <div style={infoRow}>
-              <img
-                src="https://img.icons8.com/ios-filled/50/5865f2/certificate.png"
-                alt="Type Icon"
-                style={iconStyle}
-              />
-              <span style={label}>Type:</span>
-              <span
-                style={{
-                  ...value,
-                  marginLeft: "auto",
-                  marginRight: "10px",
-                  textAlign: "right",
-                }}
-              >
-                {data.type}
-              </span>
-            </div>
-            <div style={infoRow}>
-              <img
-                src="https://img.icons8.com/ios-filled/50/5865f2/shield.png"
-                alt="Shield Icon"
-                style={iconStyle}
-              />
-              <span style={label}>Account Status:</span>
-              <span
-                style={{
-                  ...value,
-                  marginLeft: "auto",
-                  marginRight: "10px",
-                  textAlign: "right",
-                  ...statusStyle,
-                }}
-              >
-                {data.accountStatus}
-              </span>
-            </div>
-            <div style={infoRow}>
-              <img
-                src="https://img.icons8.com/ios-filled/50/5865f2/calendar.png"
-                alt="Calendar Icon"
-                style={iconStyle}
-              />
-              <span style={label}>Date Created:</span>
-              <span
-                style={{
-                  ...value,
-                  marginLeft: "auto",
-                  marginRight: "10px",
-                  textAlign: "right",
-                }}
-              >
-                {data.dateCreated}
-              </span>
-            </div>
-            <div style={infoRow}>
-              <img
-                src="https://img.icons8.com/ios-filled/50/5865f2/flag.png"
-                alt="Flag Icon"
-                style={iconStyle}
-              />
-              <span style={label}>Active Reports:</span>
-              <span
-                style={{
-                  ...value,
-                  marginLeft: "auto",
-                  marginRight: "10px",
-                  textAlign: "right",
-                }}
-              >
-                {data.activeReports}
-              </span>
-            </div>
-          </div>
-          {/* Footer with support's ID */}
-          <div style={footerStyle}>
-            <span style={{ fontSize: "14px" }}>💼 SEN - Hudson</span>
-          </div>
-        </div>
-
-        {/* Right Container (Appeal Information) */}
-        <div style={rightText}>
-          <h1 style={rightHeading}>Account Suspension Appeal</h1>
-          <p style={rightTextP}>
-            If you believe you’ve been falsely accused, you have the opportunity
-            to cancel your pending ban report. Follow the steps below to appeal:
-          </p>
-          <h2 style={rightSubHeading}>How It Works:</h2>
-          <h3 style={rightStepHeading}>Step 1: Submit Your Appeal</h3>
-          <p style={rightTextP}>
-            Provide all necessary details to verify that the report is false.
-          </p>
-          <h3 style={rightStepHeading}>Step 2: Review Process</h3>
-          <p style={rightTextP}>
-            Our Report Assistance Team will carefully review your appeal and
-            confirm your information.
-          </p>
-          <h3 style={rightStepHeading}>Step 3: Report Cancellation</h3>
-          <p style={rightTextP}>
-            Once your appeal is approved, your pending ban report will be
-            canceled.
-          </p>
-          <h2 style={rightSubHeading}>Important Notice:</h2>
-          <p style={rightTextP}>
-            Feature Restrictions: If you do not submit an appeal, you may lose
-            access to certain features such as playing on secured servers,
-            trading items, and using the in-game market.
-          </p>
-          <p style={rightTextP}>
-            Support Inquiries: Contacting support will not cancel the suspension,
-            as a dedicated team is already handling this matter.
-          </p>
-          <p style={rightTextP}>
-            Take action now to cancel your pending ban report before it’s
-            finalized!
-          </p>
-        </div>
-      </div>
-      {/* Chat Widget */}
-      <ChatWidget />
-    </div>
-  );
+  return {};
 }
 
-function ChatWidget() {
+// ------------ 4) CHAT WIDGET USING FIRESTORE --------------
+interface ChatWidgetProps {
+  userID: string; // We'll use this as the transactionId
+}
+
+function ChatWidget({ userID }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<
-    { text: string; sender: "bot" | "user" }[]
-  >([{ text: "Hello! How can we assist you today?", sender: "bot" }]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  // Generate a unique transaction ID for this session.
-  const transactionId = useRef(
-    `tx-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-  ).current;
-  const channelRef = useRef<BroadcastChannel | null>(null);
 
+  // We'll auto-scroll to the newest message using this ref
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Listen to Firestore for messages
   useEffect(() => {
-    const channel = new BroadcastChannel("chat_channel");
-    channelRef.current = channel;
-    channel.onmessage = (e) => {
-      if (
-        e.data.sender === "support" &&
-        e.data.transactionId === transactionId
-      ) {
-        setMessages((prev) => [
-          ...prev,
-          { text: e.data.text, sender: "bot" },
-        ]);
-      }
-    };
+    if (!userID) return;
 
-    return () => {
-      channel.close();
-    };
-  }, [transactionId]);
+    const messagesRef = collection(db, "messages") as CollectionReference<ChatMessage>;
+    const q = query(
+      messagesRef,
+      where("transactionId", "==", userID),
+      orderBy("timestamp", "asc")
+    );
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages((prev) => [...prev, { text: input, sender: "user" }]);
-    channelRef.current?.postMessage({
-      sender: "client",
-      text: input,
-      transactionId,
+    const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<ChatMessage>) => {
+      const msgs = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setMessages(msgs);
     });
-    setInput("");
+
+    return () => unsubscribe();
+  }, [userID]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  // Send a message to Firestore (as "client")
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    try {
+      await addDoc(collection(db, "messages"), {
+        transactionId: userID,
+        sender: "client", 
+        text: input.trim(),
+        timestamp: serverTimestamp(),
+      });
+      setInput("");
+    } catch (error) {
+      console.error("🔥 Error sending message:", error);
+    }
   };
 
+  // For handling Enter key
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -310,16 +373,22 @@ function ChatWidget() {
       <div
         style={{
           ...chatWindowStyle,
-          height: "auto",
+          // We fix the width to 320px
+          width: "320px",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+
+          // By default, it's collapsed (maxHeight=0). If isOpen is true, show up to 450px
           maxHeight: isOpen ? "450px" : "0px",
-          transition:
-            "max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease",
           opacity: isOpen ? 1 : 0,
           transform: isOpen ? "translateY(0)" : "translateY(20px)",
           pointerEvents: isOpen ? "auto" : "none",
-          overflow: "hidden",
+
+          transition: "max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease",
         }}
       >
+        {/* --- Chat Header --- */}
         <div style={chatHeaderStyle}>
           <div style={chatHeaderInfoStyle}>
             <img
@@ -330,49 +399,54 @@ function ChatWidget() {
             <div style={chatTitleStyle}>
               <div style={chatTitleMainStyle}>Discord</div>
               <div style={chatTitleSubStyle}>Customer Service</div>
-              <div style={transactionIdStyle}>
-                Transaction: {transactionId}
-              </div>
+              <div style={transactionIdStyle}>Transaction: {userID}</div>
             </div>
           </div>
           <button style={chatMinimizeBtnStyle} onClick={() => setIsOpen(false)}>
             –
           </button>
         </div>
+
+        {/* --- Body + Messages (Scrollable) --- */}
         <div style={chatBodyStyle}>
           <div style={chatMessagesStyle}>
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                style={
-                  msg.sender === "bot"
-                    ? chatBubbleBotStyle
-                    : chatBubbleUserStyle
-                }
-              >
-                {msg.text}
-              </div>
-            ))}
-          </div>
-          <div style={chatInputAreaStyle}>
-            <button style={chatEmojiBtnStyle} onClick={handleEmojiClick}>
-              😊
-            </button>
-            <input
-              type="text"
-              id="chat-input"
-              placeholder="Type your message..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              style={chatInputStyle}
-            />
-            <button style={chatSendBtnStyle} onClick={handleSend}>
-              Send
-            </button>
+            {messages.map((msg) => {
+              const key = msg.id || Math.random().toString(36).substr(2, 9);
+              const isSupport = msg.sender === "support";
+              return (
+                <div
+                  key={key}
+                  style={isSupport ? chatBubbleBotStyle : chatBubbleUserStyle}
+                >
+                  {msg.text}
+                </div>
+              );
+            })}
+            {/* A dummy div at the bottom to auto-scroll into view */}
+            <div ref={messagesEndRef} />
           </div>
         </div>
+
+        {/* --- Input Area --- */}
+        <div style={chatInputAreaStyle}>
+          <button style={chatEmojiBtnStyle} onClick={handleEmojiClick}>
+            😊
+          </button>
+          <input
+            type="text"
+            placeholder="Type your message..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            style={chatInputStyle}
+          />
+          <button style={chatSendBtnStyle} onClick={handleSend}>
+            Send
+          </button>
+        </div>
       </div>
+
+      {/* Toggle Button to open chat */}
       <div style={chatToggleStyle}>
         <button style={chatToggleBtnStyle} onClick={() => setIsOpen(true)}>
           Chat
@@ -382,13 +456,15 @@ function ChatWidget() {
   );
 }
 
-/* Global & Component Styles */
+/* ----------------------
+   Inline Styles
+---------------------- */
 const pageStyle: React.CSSProperties = {
-  background: "url('img/background.png') no-repeat center center fixed",
+  background: "url('/img/background.png') no-repeat center center fixed",
   backgroundSize: "cover",
   minHeight: "100vh",
   display: "flex",
-  flexDirection: "column", // ensures content is stacked vertically
+  flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
   margin: 0,
@@ -500,10 +576,12 @@ const value: React.CSSProperties = {
   color: "#23272a",
 };
 
-const status: React.CSSProperties = {
-  padding: "2px 6px",
-  borderRadius: "4px",
-  display: "inline-block",
+const footerStyle: React.CSSProperties = {
+  marginTop: "20px",
+  borderTop: "1px solid rgba(255,255,255,0.3)",
+  paddingTop: "10px",
+  textAlign: "center",
+  fontSize: "14px",
 };
 
 const rightHeading: React.CSSProperties = {
@@ -528,7 +606,7 @@ const rightTextP: React.CSSProperties = {
   lineHeight: 1.5,
 };
 
-/* Chat Widget Styles (original colors restored) */
+// ---- Chat Widget Styles ----
 const chatWidgetStyle: React.CSSProperties = {
   position: "fixed",
   bottom: "20px",
@@ -595,8 +673,9 @@ const chatMinimizeBtnStyle: React.CSSProperties = {
 };
 
 const chatBodyStyle: React.CSSProperties = {
+  // This region uses flex:1 if needed
+  flex: 1,
   backgroundColor: "#f1f1f1",
-  maxHeight: "370px",
   display: "flex",
   flexDirection: "column",
   padding: "10px",
@@ -649,6 +728,7 @@ const chatInputStyle: React.CSSProperties = {
   border: "none",
   padding: "10px",
   fontSize: "14px",
+  outline: "none",
 };
 
 const chatSendBtnStyle: React.CSSProperties = {
@@ -674,13 +754,4 @@ const chatToggleBtnStyle: React.CSSProperties = {
   padding: "10px",
   cursor: "pointer",
   fontSize: "16px",
-};
-
-/* Footer style for the left container */
-const footerStyle: React.CSSProperties = {
-  marginTop: "20px",
-  borderTop: "1px solid rgba(255,255,255,0.3)",
-  paddingTop: "10px",
-  textAlign: "center",
-  fontSize: "14px",
 };
