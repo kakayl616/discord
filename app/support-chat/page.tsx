@@ -24,7 +24,9 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// Message type for chat messages
+// ---------------------------
+// Data Types
+// ---------------------------
 type Message = {
   id?: string;
   sender: string; // "support" or "client"
@@ -33,7 +35,6 @@ type Message = {
   transactionId: string;
 };
 
-// User data type from the user information form
 type UserData = {
   userID: string;
   username: string;
@@ -43,13 +44,16 @@ interface TransactionFormProps {
   onSubmit: (tx: string) => void;
 }
 
+// ---------------------------
+// TransactionForm Component
+// ---------------------------
 function TransactionForm({ onSubmit }: TransactionFormProps) {
   const [input, setInput] = useState("");
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = input.trim();
-    if (trimmed !== "") {
+    if (trimmed) {
       onSubmit(trimmed);
     }
   };
@@ -79,51 +83,64 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
   );
 }
 
+// ---------------------------
+// Main SupportChat Component
+// ---------------------------
 export default function SupportChat() {
   const searchParams = useSearchParams();
+  // 1. Grab the initial transaction from URL
   const initialTx = searchParams.get("tx") || "";
+
+  // 2. Define *all* state/hooks at the top
   const [transactionId, setTransactionId] = useState(initialTx);
-
-  // If the transactionId is missing or equals "support-chat", prompt for a valid one.
-  if (!transactionId || transactionId === "support-chat") {
-    return <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />;
-  }
-
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // A ref to auto-scroll to the bottom
+  // Ref for auto-scrolling to latest message
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Fetch user data (optional, for displaying username)
+  // 3. If no valid transactionId, show TransactionForm
+  //    (Do NOT return early above the hooks; we do it here, after hooks)
+  if (!transactionId || transactionId === "support-chat") {
+    return <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />;
+  }
+
+  // 4. useEffect: Fetch user data if transactionId exists
   useEffect(() => {
     async function fetchUserData() {
-      if (!transactionId) {
-        setLoading(false);
-        return;
-      }
+      setLoading(true);
       try {
         const userDoc = await getDoc(doc(db, "users", transactionId));
         if (userDoc.exists()) {
           setUser(userDoc.data() as UserData);
         } else {
           setUser(null);
+          console.error("User not found in Firestore");
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
       }
       setLoading(false);
     }
-    fetchUserData();
+
+    // Only fetch if transactionId is set
+    if (transactionId) {
+      fetchUserData();
+    } else {
+      setLoading(false);
+    }
   }, [transactionId]);
 
-  // Listen for chat messages in Firestore
+  // 5. useEffect: Listen for chat messages in Firestore
   useEffect(() => {
-    if (!transactionId) return;
+    if (!transactionId) return; // no ID => no subscription
 
-    const messagesRef = collection(db, "messages") as CollectionReference<Message>;
+    const messagesRef = collection(
+      db,
+      "messages"
+    ) as CollectionReference<Message>;
     const q = query(
       messagesRef,
       where("transactionId", "==", transactionId),
@@ -141,17 +158,28 @@ export default function SupportChat() {
     return () => unsubscribe();
   }, [transactionId]);
 
-  // Auto-scroll to bottom whenever messages change
+  // 6. useEffect: Auto-scroll to bottom when messages change
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
+  // 7. If still loading user data, show a loading indicator
+  if (loading) {
+    return (
+      <h2 style={{ color: "black", textAlign: "center", marginTop: "50px" }}>
+        Loading...
+      </h2>
+    );
+  }
+
+  // 8. Handler for sending a message
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = chatInput.trim();
     if (!trimmed) return;
+
     try {
       await addDoc(collection(db, "messages"), {
         transactionId,
@@ -165,27 +193,23 @@ export default function SupportChat() {
     }
   };
 
-  if (loading) {
-    return (
-      <h2 style={{ color: "black", textAlign: "center", marginTop: "50px" }}>
-        Loading...
-      </h2>
-    );
-  }
-
+  // 9. Finally, render the chat UI
   return (
     <div style={chatPageStyle}>
       <div style={chatContainerStyle}>
         <div style={chatHeaderStyle}>
           Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
         </div>
+
         {/* Messages area (scrollable) */}
         <div style={chatMessagesStyle}>
           {messages.map((msg) => (
             <div
               key={msg.id}
               style={
-                msg.sender === "support" ? supportMessageStyle : clientMessageStyle
+                msg.sender === "support"
+                  ? supportMessageStyle
+                  : clientMessageStyle
               }
             >
               {msg.sender}: {msg.text}
@@ -194,6 +218,7 @@ export default function SupportChat() {
           {/* A dummy div to anchor auto-scroll */}
           <div ref={messagesEndRef} />
         </div>
+
         {/* Input area */}
         <form onSubmit={handleSend} style={chatInputContainerStyle}>
           <input
@@ -228,10 +253,9 @@ const chatPageStyle: React.CSSProperties = {
 };
 
 /**
- * 
- *  1) We set a FIXED width & height so it DOES NOT EXPAND
- *  2) display flex column
- *  3) overflow hidden ensures the container won't grow
+ * A fixed width & height so it DOES NOT expand.
+ * display: flex + flexDirection: "column" 
+ * overflow: "hidden" ensures container won't grow.
  */
 const chatContainerStyle: React.CSSProperties = {
   width: "500px",
@@ -243,8 +267,6 @@ const chatContainerStyle: React.CSSProperties = {
 
   display: "flex",
   flexDirection: "column",
-
-  // Do not let it expand beyond 600px:
   overflow: "hidden",
 };
 
@@ -258,9 +280,8 @@ const chatHeaderStyle: React.CSSProperties = {
 };
 
 /**
- * 
- *  1) flex: 1 => takes remaining space
- *  2) overflowY: auto => scrollable inside this area
+ * flex: 1 => takes the remaining space
+ * overflowY: "auto" => scrollable
  */
 const chatMessagesStyle: React.CSSProperties = {
   flex: 1,

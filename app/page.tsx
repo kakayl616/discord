@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, ChangeEvent, FormEvent } from "react";
-import { useRouter } from "next/navigation";
+//import { useRouter } from "next/navigation";
 import { db } from "../lib/firebase";
-import { collection, setDoc, doc } from "firebase/firestore";
+import { setDoc, doc } from "firebase/firestore";
 
 type FormData = {
   userID: string;
@@ -17,7 +17,7 @@ type FormData = {
 };
 
 export default function HomePage() {
-  const router = useRouter();
+  //const router = useRouter();
 
   // --- User Information Form state ---
   const [formValues, setFormValues] = useState<FormData>({
