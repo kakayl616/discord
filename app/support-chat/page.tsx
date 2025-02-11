@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useEffect,
-  ChangeEvent,
-  FormEvent,
-  useRef,
-} from "react";
+import React, { Suspense, useState, useEffect, ChangeEvent, FormEvent, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   collection,
@@ -59,24 +53,16 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{ textAlign: "center", marginTop: "50px" }}
-    >
+    <form onSubmit={handleSubmit} style={{ textAlign: "center", marginTop: "50px" }}>
       <h2>Please enter a valid transaction ID:</h2>
       <input
         type="text"
         value={input}
-        onChange={(e: ChangeEvent<HTMLInputElement>) =>
-          setInput(e.target.value)
-        }
+        onChange={(e: ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
         placeholder="Enter Transaction ID"
         style={{ padding: "10px", fontSize: "16px" }}
       />
-      <button
-        type="submit"
-        style={{ padding: "10px 20px", marginLeft: "10px" }}
-      >
+      <button type="submit" style={{ padding: "10px 20px", marginLeft: "10px" }}>
         Submit
       </button>
     </form>
@@ -84,13 +70,14 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
 }
 
 // ---------------------------
-// Main SupportChat Component
+// ChatContent Component (Inner Component)
+// Contains all logic that uses useSearchParams and Firebase hooks
 // ---------------------------
-export default function SupportChat() {
+function ChatContent() {
   const searchParams = useSearchParams();
   const initialTx = searchParams.get("tx") || "";
 
-  // 1) Define all hooks at the top (no early returns first!)
+  // 1) Define hooks at the top
   const [transactionId, setTransactionId] = useState(initialTx);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -118,7 +105,6 @@ export default function SupportChat() {
       setLoading(false);
     }
 
-    // If no transactionId, skip fetching user
     if (transactionId) {
       fetchUserData();
     }
@@ -153,13 +139,11 @@ export default function SupportChat() {
     }
   }, [messages]);
 
-  // 5) Now we do conditional rendering, AFTER hooks are defined
-  // If no transactionId or it's "support-chat", show form
+  // 5) Conditional rendering after all hooks are defined
   if (!transactionId || transactionId === "support-chat") {
     return <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />;
   }
 
-  // If we're still loading user data, show a loading indicator
   if (loading) {
     return (
       <h2 style={{ color: "black", textAlign: "center", marginTop: "50px" }}>
@@ -195,16 +179,12 @@ export default function SupportChat() {
           Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
         </div>
 
-        {/* Messages area (scrollable) */}
+        {/* Messages area */}
         <div style={chatMessagesStyle}>
           {messages.map((msg) => (
             <div
               key={msg.id}
-              style={
-                msg.sender === "support"
-                  ? supportMessageStyle
-                  : clientMessageStyle
-              }
+              style={msg.sender === "support" ? supportMessageStyle : clientMessageStyle}
             >
               {msg.sender}: {msg.text}
             </div>
@@ -217,9 +197,7 @@ export default function SupportChat() {
           <input
             type="text"
             value={chatInput}
-            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              setChatInput(e.target.value)
-            }
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setChatInput(e.target.value)}
             placeholder="Type your message..."
             style={chatInputStyle}
           />
@@ -229,6 +207,17 @@ export default function SupportChat() {
         </form>
       </div>
     </div>
+  );
+}
+
+// ---------------------------
+// SupportChat Component (Wrapper with Suspense)
+// ---------------------------
+export default function SupportChat() {
+  return (
+    <Suspense fallback={<div style={{ textAlign: "center", marginTop: "50px" }}>Loading chat...</div>}>
+      <ChatContent />
+    </Suspense>
   );
 }
 
@@ -247,12 +236,11 @@ const chatPageStyle: React.CSSProperties = {
 
 const chatContainerStyle: React.CSSProperties = {
   width: "500px",
-  height: "600px", // FIXED height
+  height: "600px",
   backgroundColor: "white",
   border: "1px solid #ccc",
   borderRadius: "10px",
   boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
-
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
