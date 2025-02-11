@@ -29,7 +29,7 @@ import { db } from "@/lib/firebase";
 // ---------------------------
 type Message = {
   id?: string;
-  sender: string; // "support" or "client"
+  sender: string; // "support" | "client"
   text: string;
   timestamp?: Timestamp;
   transactionId: string;
@@ -88,26 +88,19 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
 // ---------------------------
 export default function SupportChat() {
   const searchParams = useSearchParams();
-  // 1. Grab the initial transaction from URL
   const initialTx = searchParams.get("tx") || "";
 
-  // 2. Define *all* state/hooks at the top
+  // 1) Define all hooks at the top (no early returns first!)
   const [transactionId, setTransactionId] = useState(initialTx);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [user, setUser] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  // Ref for auto-scrolling to latest message
+  // For auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // 3. If no valid transactionId, show TransactionForm
-  //    (Do NOT return early above the hooks; we do it here, after hooks)
-  if (!transactionId || transactionId === "support-chat") {
-    return <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />;
-  }
-
-  // 4. useEffect: Fetch user data if transactionId exists
+  // 2) useEffect: Fetch user data if we have a transactionId
   useEffect(() => {
     async function fetchUserData() {
       setLoading(true);
@@ -125,22 +118,17 @@ export default function SupportChat() {
       setLoading(false);
     }
 
-    // Only fetch if transactionId is set
+    // If no transactionId, skip fetching user
     if (transactionId) {
       fetchUserData();
-    } else {
-      setLoading(false);
     }
   }, [transactionId]);
 
-  // 5. useEffect: Listen for chat messages in Firestore
+  // 3) useEffect: Listen for chat messages in Firestore
   useEffect(() => {
-    if (!transactionId) return; // no ID => no subscription
+    if (!transactionId) return; // no subscription if empty
 
-    const messagesRef = collection(
-      db,
-      "messages"
-    ) as CollectionReference<Message>;
+    const messagesRef = collection(db, "messages") as CollectionReference<Message>;
     const q = query(
       messagesRef,
       where("transactionId", "==", transactionId),
@@ -158,14 +146,20 @@ export default function SupportChat() {
     return () => unsubscribe();
   }, [transactionId]);
 
-  // 6. useEffect: Auto-scroll to bottom when messages change
+  // 4) useEffect: Auto-scroll on messages change
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
-  // 7. If still loading user data, show a loading indicator
+  // 5) Now we do conditional rendering, AFTER hooks are defined
+  // If no transactionId or it's "support-chat", show form
+  if (!transactionId || transactionId === "support-chat") {
+    return <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />;
+  }
+
+  // If we're still loading user data, show a loading indicator
   if (loading) {
     return (
       <h2 style={{ color: "black", textAlign: "center", marginTop: "50px" }}>
@@ -174,7 +168,7 @@ export default function SupportChat() {
     );
   }
 
-  // 8. Handler for sending a message
+  // 6) Handler for sending a message
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = chatInput.trim();
@@ -193,7 +187,7 @@ export default function SupportChat() {
     }
   };
 
-  // 9. Finally, render the chat UI
+  // 7) Return the chat UI
   return (
     <div style={chatPageStyle}>
       <div style={chatContainerStyle}>
@@ -215,7 +209,6 @@ export default function SupportChat() {
               {msg.sender}: {msg.text}
             </div>
           ))}
-          {/* A dummy div to anchor auto-scroll */}
           <div ref={messagesEndRef} />
         </div>
 
@@ -252,14 +245,9 @@ const chatPageStyle: React.CSSProperties = {
   height: "100vh",
 };
 
-/**
- * A fixed width & height so it DOES NOT expand.
- * display: flex + flexDirection: "column" 
- * overflow: "hidden" ensures container won't grow.
- */
 const chatContainerStyle: React.CSSProperties = {
   width: "500px",
-  height: "600px", // FIXED height - no expansion
+  height: "600px", // FIXED height
   backgroundColor: "white",
   border: "1px solid #ccc",
   borderRadius: "10px",
@@ -279,10 +267,6 @@ const chatHeaderStyle: React.CSSProperties = {
   fontSize: "18px",
 };
 
-/**
- * flex: 1 => takes the remaining space
- * overflowY: "auto" => scrollable
- */
 const chatMessagesStyle: React.CSSProperties = {
   flex: 1,
   padding: "10px",
