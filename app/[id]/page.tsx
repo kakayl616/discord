@@ -223,42 +223,49 @@ export default function UserPage() {
           </div>
 
           {/* Right Container (Appeal Information) */}
-          <div style={rightText}>
-            <h1 style={rightHeading}>Account Suspension Appeal</h1>
-            <p style={rightTextP}>
-              If you believe you’ve been falsely accused, you have the opportunity
-              to cancel your pending ban report. Follow the steps below to appeal:
-            </p>
-            <h2 style={rightSubHeading}>How It Works:</h2>
-            <h3 style={rightStepHeading}>Step 1: Submit Your Appeal</h3>
-            <p style={rightTextP}>
-              Provide all necessary details to verify that the report is false.
-            </p>
-            <h3 style={rightStepHeading}>Step 2: Review Process</h3>
-            <p style={rightTextP}>
-              Our Report Assistance Team will carefully review your appeal and
-              confirm your information.
-            </p>
-            <h3 style={rightStepHeading}>Step 3: Report Cancellation</h3>
-            <p style={rightTextP}>
-              Once your appeal is approved, your pending ban report will be
-              canceled.
-            </p>
-            <h2 style={rightSubHeading}>Important Notice:</h2>
-            <p style={rightTextP}>
-              Feature Restrictions: If you do not submit an appeal, you may lose
-              access to certain features such as playing on secured servers,
-              trading items, and using the in-game market.
-            </p>
-            <p style={rightTextP}>
-              Support Inquiries: Contacting support will not cancel the suspension,
-              as a dedicated team is already handling this matter.
-            </p>
-            <p style={rightTextP}>
-              Take action now to cancel your pending ban report before it’s
-              finalized!
-            </p>
-          </div>
+          {/* Right Container (Appeal Information) */}
+<div style={rightText}>
+  <h1 style={rightHeading}>Submit Your Appeal</h1>
+  <p style={rightTextP}>
+    Contact Support via the chat window (bottom right corner).
+  </p>
+  <p style={rightTextP}>
+    Provide all necessary details to prove that the report is false.
+  </p>
+
+  <h2 style={rightSubHeading}>Review Process</h2>
+  <p style={rightTextP}>
+    The Report Assistance Team will carefully review your appeal.
+  </p>
+  <p style={rightTextP}>
+    They will verify the provided information and determine whether the report is valid or false.
+  </p>
+
+  <h2 style={rightSubHeading}>Report Cancellation</h2>
+  <p style={rightTextP}>
+    If your appeal is approved, the pending ban report will be canceled.
+  </p>
+  <p style={rightTextP}>
+    If not approved, the suspension may proceed.
+  </p>
+
+  <h2 style={rightSubHeading}>Important Notes:</h2>
+  <h3 style={rightStepHeading}>Feature Restrictions:</h3>
+  <p style={rightTextP}>
+    If you do not submit an appeal, you risk losing access to key Discord features—including private servers, direct messaging, and other community channels.
+  </p>
+  <h3 style={rightStepHeading}>Support Inquiries:</h3>
+  <p style={rightTextP}>
+    Contacting support via other means (such as email) will not cancel the suspension.
+  </p>
+  <p style={rightTextP}>
+    You must use the chat window to reach the correct team.
+  </p>
+  <p style={rightTextP}>
+    🔹 Action Required: To prevent the ban from being finalized, submit your appeal through the Chat Support window as soon as possible.
+  </p>
+</div>
+
         </div>
       ) : (
         <h2 style={{ color: "red", textAlign: "center", marginTop: "50px" }}>
