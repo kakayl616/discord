@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import React, {
@@ -9,7 +10,8 @@ import React, {
   FormEvent,
 } from "react";
 import { useParams } from "next/navigation";
-import { db } from "../../lib/firebase"; // your Firestore instance
+import { db } from "../../lib/firebase";
+// Import Timestamp to avoid using `any` for Firestore timestamps:
 import {
   doc,
   getDoc,
@@ -22,6 +24,7 @@ import {
   serverTimestamp,
   CollectionReference,
   QuerySnapshot,
+  Timestamp,
 } from "firebase/firestore";
 
 // ------------ 1) FIRESTORE DATA TYPES --------------
@@ -36,12 +39,12 @@ type UserData = {
   bannerImage: string;
 };
 
-// For the chat messages in Firestore
+// Updated to use `Timestamp` instead of `any`.
 type ChatMessage = {
   id?: string;
   sender: "client" | "support";
   text: string;
-  timestamp?: any; // Firestore timestamp
+  timestamp?: Timestamp; // <-- Fixes the "any" type error
   transactionId: string;
 };
 
@@ -280,7 +283,6 @@ function getStatusStyle(accountStatus: string) {
       padding: "2px 6px",
     };
   } else if (statusLower.includes("pending")) {
-    // Some folks name it "Pending Case" or just "Pending"
     return {
       backgroundColor: "rgba(255, 165, 0, 0.2)",
       color: "orange",
@@ -315,7 +317,10 @@ function ChatWidget({ userID }: ChatWidgetProps) {
   useEffect(() => {
     if (!userID) return;
 
-    const messagesRef = collection(db, "messages") as CollectionReference<ChatMessage>;
+    const messagesRef = collection(
+      db,
+      "messages"
+    ) as CollectionReference<ChatMessage>;
     const q = query(
       messagesRef,
       where("transactionId", "==", userID),
@@ -346,7 +351,7 @@ function ChatWidget({ userID }: ChatWidgetProps) {
     try {
       await addDoc(collection(db, "messages"), {
         transactionId: userID,
-        sender: "client", 
+        sender: "client",
         text: input.trim(),
         timestamp: serverTimestamp(),
       });
@@ -373,7 +378,6 @@ function ChatWidget({ userID }: ChatWidgetProps) {
       <div
         style={{
           ...chatWindowStyle,
-          // We fix the width to 320px
           width: "320px",
           display: "flex",
           flexDirection: "column",
@@ -385,7 +389,8 @@ function ChatWidget({ userID }: ChatWidgetProps) {
           transform: isOpen ? "translateY(0)" : "translateY(20px)",
           pointerEvents: isOpen ? "auto" : "none",
 
-          transition: "max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease",
+          transition:
+            "max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease",
         }}
       >
         {/* --- Chat Header --- */}
@@ -673,7 +678,6 @@ const chatMinimizeBtnStyle: React.CSSProperties = {
 };
 
 const chatBodyStyle: React.CSSProperties = {
-  // This region uses flex:1 if needed
   flex: 1,
   backgroundColor: "#f1f1f1",
   display: "flex",
