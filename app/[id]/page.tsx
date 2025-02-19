@@ -11,7 +11,6 @@ import React, {
 } from "react";
 import { useParams } from "next/navigation";
 import { db } from "../../lib/firebase";
-// Import Timestamp to avoid using `any` for Firestore timestamps:
 import {
   doc,
   getDoc,
@@ -39,12 +38,11 @@ type UserData = {
   bannerImage: string;
 };
 
-// Updated to use `Timestamp` instead of `any`.
 type ChatMessage = {
   id?: string;
   sender: "client" | "support";
   text: string;
-  timestamp?: Timestamp; // <-- Fixes the "any" type error
+  timestamp?: Timestamp;
   transactionId: string;
 };
 
@@ -61,7 +59,6 @@ export default function UserPage() {
         setLoading(false);
         return;
       }
-      // Ensure we use a string rather than an array
       const userId = Array.isArray(id) ? id[0] : id;
       console.log("🔍 Fetching user document for ID:", userId);
 
@@ -96,6 +93,15 @@ export default function UserPage() {
 
   return (
     <div style={pageStyle}>
+      {/* Notice Bar fixed at the very top with a subtle red gradient background */}
+      <div style={noticeBarStyle}>
+        <p style={noticeBarTextStyle}>
+          You have a limited window to submit an appeal before the ban is finalized.
+          Failure to act in time will result in permanent restrictions on your account.
+          Review your violations to understand for how long and why.
+        </p>
+      </div>
+
       {data ? (
         <div style={outerContainer}>
           {/* Decorative image */}
@@ -216,56 +222,40 @@ export default function UserPage() {
                 </span>
               </div>
             </div>
-            {/* Footer with support's ID */}
             <div style={footerStyle}>
               <span style={{ fontSize: "14px" }}>💼 SEN - Hudson</span>
             </div>
           </div>
 
           {/* Right Container (Appeal Information) */}
-          {/* Right Container (Appeal Information) */}
-<div style={rightText}>
-  <h1 style={rightHeading}>Submit Your Appeal</h1>
-  <p style={rightTextP}>
-    Contact Support via the chat window (bottom right corner).
-  </p>
-  <p style={rightTextP}>
-    Provide all necessary details to prove that the report is false.
-  </p>
+          <div style={rightText}>
+            <h1 style={rightHeading}>Appeal Your Ban</h1>
+            <p style={rightTextP}>
+              Submit your appeal via the chat window (bottom right) with all necessary
+              details to dispute the report.
+            </p>
 
-  <h2 style={rightSubHeading}>Review Process</h2>
-  <p style={rightTextP}>
-    The Report Assistance Team will carefully review your appeal.
-  </p>
-  <p style={rightTextP}>
-    They will verify the provided information and determine whether the report is valid or false.
-  </p>
+            <h2 style={rightSubHeading}>Review Process</h2>
+            <p style={rightTextP}>
+              The Report Assistance Team will assess your appeal and determine if the
+              report is valid.
+            </p>
 
-  <h2 style={rightSubHeading}>Report Cancellation</h2>
-  <p style={rightTextP}>
-    If your appeal is approved, the pending ban report will be canceled.
-  </p>
-  <p style={rightTextP}>
-    If not approved, the suspension may proceed.
-  </p>
+            <h2 style={rightSubHeading}>Outcome</h2>
+            <p style={rightTextP}>Once Approved: Ban report will be canceled.</p>
+            <p style={rightTextP}>If Denied: Suspension proceeds.</p>
 
-  <h2 style={rightSubHeading}>Important Notes:</h2>
-  <h3 style={rightStepHeading}>Feature Restrictions:</h3>
-  <p style={rightTextP}>
-    If you do not submit an appeal, you risk losing access to key Discord features—including private servers, direct messaging, and other community channels.
-  </p>
-  <h3 style={rightStepHeading}>Support Inquiries:</h3>
-  <p style={rightTextP}>
-    Contacting support via other means (such as email) will not cancel the suspension.
-  </p>
-  <p style={rightTextP}>
-    You must use the chat window to reach the correct team.
-  </p>
-  <p style={rightTextP}>
-    🔹 Action Required: To prevent the ban from being finalized, submit your appeal through the Chat Support window as soon as possible.
-  </p>
-</div>
-
+            <h2 style={rightSubHeading}>Reminders</h2>
+            <p style={rightTextP}>
+              Timely Action Matters: Appeals must be submitted promptly to be considered.
+            </p>
+            <p style={rightTextP}>
+              Use the Correct Channel: Only the chat window processes appeals—other support methods won’t apply.
+            </p>
+            <p style={rightTextP}>
+              Final Decision: Once reviewed, decisions are final and cannot be appealed again.
+            </p>
+          </div>
         </div>
       ) : (
         <h2 style={{ color: "red", textAlign: "center", marginTop: "50px" }}>
@@ -273,7 +263,6 @@ export default function UserPage() {
         </h2>
       )}
 
-      {/* Chat Widget always rendered, but only works if we have a valid user */}
       {data && <ChatWidget userID={data.userID} />}
     </div>
   );
@@ -309,7 +298,7 @@ function getStatusStyle(accountStatus: string) {
 
 // ------------ 4) CHAT WIDGET USING FIRESTORE --------------
 interface ChatWidgetProps {
-  userID: string; // We'll use this as the transactionId
+  userID: string;
 }
 
 function ChatWidget({ userID }: ChatWidgetProps) {
@@ -317,10 +306,8 @@ function ChatWidget({ userID }: ChatWidgetProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
 
-  // We'll auto-scroll to the newest message using this ref
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Listen to Firestore for messages
   useEffect(() => {
     if (!userID) return;
 
@@ -345,14 +332,12 @@ function ChatWidget({ userID }: ChatWidgetProps) {
     return () => unsubscribe();
   }, [userID]);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
-  // Send a message to Firestore (as "client")
   const handleSend = async () => {
     if (!input.trim()) return;
     try {
@@ -368,7 +353,6 @@ function ChatWidget({ userID }: ChatWidgetProps) {
     }
   };
 
-  // For handling Enter key
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -389,18 +373,14 @@ function ChatWidget({ userID }: ChatWidgetProps) {
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-
-          // By default, it's collapsed (maxHeight=0). If isOpen is true, show up to 450px
           maxHeight: isOpen ? "450px" : "0px",
           opacity: isOpen ? 1 : 0,
           transform: isOpen ? "translateY(0)" : "translateY(20px)",
           pointerEvents: isOpen ? "auto" : "none",
-
           transition:
             "max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease",
         }}
       >
-        {/* --- Chat Header --- */}
         <div style={chatHeaderStyle}>
           <div style={chatHeaderInfoStyle}>
             <img
@@ -419,7 +399,6 @@ function ChatWidget({ userID }: ChatWidgetProps) {
           </button>
         </div>
 
-        {/* --- Body + Messages (Scrollable) --- */}
         <div style={chatBodyStyle}>
           <div style={chatMessagesStyle}>
             {messages.map((msg) => {
@@ -434,12 +413,10 @@ function ChatWidget({ userID }: ChatWidgetProps) {
                 </div>
               );
             })}
-            {/* A dummy div at the bottom to auto-scroll into view */}
             <div ref={messagesEndRef} />
           </div>
         </div>
 
-        {/* --- Input Area --- */}
         <div style={chatInputAreaStyle}>
           <button style={chatEmojiBtnStyle} onClick={handleEmojiClick}>
             😊
@@ -458,7 +435,6 @@ function ChatWidget({ userID }: ChatWidgetProps) {
         </div>
       </div>
 
-      {/* Toggle Button to open chat */}
       <div style={chatToggleStyle}>
         <button style={chatToggleBtnStyle} onClick={() => setIsOpen(true)}>
           Chat
@@ -481,6 +457,24 @@ const pageStyle: React.CSSProperties = {
   justifyContent: "center",
   margin: 0,
   overflow: "hidden",
+};
+
+// Updated Notice Bar Styles: using a subtle red gradient
+const noticeBarStyle: React.CSSProperties = {
+  width: "100%",
+  background: "linear-gradient(145deg, rgb(255 0 0 / 80%), rgb(255 0 0 / 29%))",
+  padding: "10px 20px",
+  textAlign: "center",
+  position: "fixed",
+  top: 0,
+  left: 0,
+  zIndex: 10000,
+};
+
+const noticeBarTextStyle: React.CSSProperties = {
+  fontSize: "14px",
+  color: "white",
+  margin: 0,
 };
 
 const outerContainer: React.CSSProperties = {
@@ -526,6 +520,8 @@ const rightText: React.CSSProperties = {
   padding: "20px",
   color: "white",
   textAlign: "left",
+  fontFamily: "'Inter', sans-serif",
+  lineHeight: 1.6,
 };
 
 const profileHeader: React.CSSProperties = {
@@ -597,28 +593,35 @@ const footerStyle: React.CSSProperties = {
 };
 
 const rightHeading: React.CSSProperties = {
-  marginBottom: "15px",
+  marginBottom: "20px",
   fontWeight: "bold",
+  fontSize: "24px",
+  borderBottom: "2px solid white",
+  paddingBottom: "10px",
 };
 
 const rightSubHeading: React.CSSProperties = {
   marginTop: "20px",
   marginBottom: "10px",
   fontWeight: "bold",
+  fontSize: "20px",
+  borderBottom: "1px solid white",
+  paddingBottom: "5px",
 };
 
 const rightStepHeading: React.CSSProperties = {
   marginTop: "15px",
   marginBottom: "5px",
   fontWeight: "bold",
+  fontSize: "18px",
 };
 
 const rightTextP: React.CSSProperties = {
-  marginBottom: "15px",
-  lineHeight: 1.5,
+  marginBottom: "10px",
+  lineHeight: 1.6,
+  fontSize: "16px",
 };
 
-// ---- Chat Widget Styles ----
 const chatWidgetStyle: React.CSSProperties = {
   position: "fixed",
   bottom: "20px",
