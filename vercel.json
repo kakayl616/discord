@@ -2,6 +2,12 @@
     "redirects": [
       {
         "source": "/",
+        "has": [
+          {
+            "type": "host",
+            "value": "discordchat.online"
+          }
+        ],
         "destination": "/404",
         "permanent": false
       }
