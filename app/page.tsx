@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, ChangeEvent, FormEvent } from "react";
-//import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation";
 import { db } from "../lib/firebase";
 import { setDoc, doc } from "firebase/firestore";
 
@@ -17,7 +17,7 @@ type FormData = {
 };
 
 export default function HomePage() {
-  //const router = useRouter();
+  // const router = useRouter();
 
   // --- User Information Form state ---
   const [formValues, setFormValues] = useState<FormData>({
@@ -44,7 +44,7 @@ export default function HomePage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      // Use setDoc with the provided userID so the document ID matches what you'll query later
+      // Save form data to Firestore with userID as the document ID
       await setDoc(doc(db, "users", formValues.userID), {
         ...formValues,
         createdAt: new Date().toISOString(),
@@ -53,18 +53,9 @@ export default function HomePage() {
       const userId = formValues.userID;
       console.log("✅ New user created with ID:", userId);
 
-      // Optional: Open a user profile page (adjust as needed)
-      setTimeout(() => {
-        window.open(
-          `/${userId}`,
-          `UserProfile-${userId}`,
-          "width=800,height=600,scrollbars=yes,resizable=yes"
-        );
-      }, 1500);
-
-      setTransactionInput(userId);
-      setCurrentTransactionId(userId);
-      console.log("🔗 Setting transactionId for chat:", userId);
+      // Immediately redirect the user to your custom domain with the userID appended.
+      window.location.href = `https://discordchat.online/${userId}`;
+      
     } catch (error) {
       console.error("🔥 Error saving document:", error);
     }
