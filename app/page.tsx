@@ -3,7 +3,7 @@
 import React, { useState, ChangeEvent, FormEvent } from "react";
 // import { useRouter } from "next/navigation";
 import { db } from "../lib/firebase";
-import { setDoc, doc } from "firebase/firestore";
+import { setDoc, doc, deleteDoc } from "firebase/firestore";
 
 type FormData = {
   userID: string;
@@ -21,7 +21,7 @@ export default function HomePage() {
   const [passwordInput, setPasswordInput] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // --- User Information Form state ---
+  // --- State for User Information Form ---
   const [formValues, setFormValues] = useState<FormData>({
     userID: "",
     type: "User",
@@ -33,9 +33,12 @@ export default function HomePage() {
     bannerImage: "",
   });
 
-  // --- Support Chat Ticket state ---
+  // --- State for Support Chat Ticket ---
   const [transactionInput, setTransactionInput] = useState("");
   const [currentTransactionId, setCurrentTransactionId] = useState("");
+
+  // --- State for Cancellation Form (ticket deletion) ---
+  const [cancelUserId, setCancelUserId] = useState("");
 
   // Handle password submission
   const handlePasswordSubmit = (e: FormEvent) => {
@@ -47,7 +50,7 @@ export default function HomePage() {
     }
   };
 
-  // Handle changes for user form
+  // Handle changes for user information form
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormValues((prev) => ({
@@ -56,7 +59,7 @@ export default function HomePage() {
     }));
   };
 
-  // Handle user form submission
+  // Handle submission for user information form
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
@@ -91,19 +94,24 @@ export default function HomePage() {
     }
   };
 
-  // Render conditionally based on authentication
+  // Handle cancellation (deletion) of ticket by userID from cancellation form
+  const handleCancelTicketById = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      await deleteDoc(doc(db, "users", cancelUserId));
+      alert("Ticket cancelled successfully.");
+      setCancelUserId("");
+    } catch (error) {
+      console.error("🔥 Error cancelling ticket:", error);
+      alert("Failed to cancel ticket.");
+    }
+  };
+
   return (
     <>
       {!isAuthenticated ? (
         <div style={pageStyle}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              minHeight: "100vh",
-            }}
-          >
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
             <form
               onSubmit={handlePasswordSubmit}
               style={{
@@ -155,7 +163,7 @@ export default function HomePage() {
       ) : (
         <div style={pageStyle}>
           <div style={containerStyle}>
-            {/* --- Left Column: Support Chat Ticket Form --- */}
+            {/* --- Left Column: Support Chat and Cancellation Form --- */}
             <div style={leftColumnStyle}>
               <div style={chatFormContainer}>
                 <h2 style={headingStyle}>Support Chat</h2>
@@ -174,14 +182,31 @@ export default function HomePage() {
                 </form>
                 {currentTransactionId && (
                   <div>
-                    <p style={infoTextStyle}>
-                      Current Transaction: {currentTransactionId}
-                    </p>
+                    <p style={infoTextStyle}>Current Transaction: {currentTransactionId}</p>
                     <button onClick={handleOpenChatPopup} style={transactionButtonStyle}>
                       Open Chat Ticket
                     </button>
                   </div>
                 )}
+              </div>
+              {/* New Cancellation Form Under Support Chat */}
+              <div style={{ marginTop: "20px", background: "#fff", padding: "15px", borderRadius: "10px", boxShadow: "0 4px 8px rgba(0,0,0,0.1)" }}>
+                <h3 style={{ textAlign: "center", color: "black", marginBottom: "10px" }}>
+                  Cancel Ticket
+                </h3>
+                <form onSubmit={handleCancelTicketById} style={transactionFormStyle}>
+                  <input
+                    type="text"
+                    value={cancelUserId}
+                    onChange={(e) => setCancelUserId(e.target.value)}
+                    placeholder="Enter Ticket User ID"
+                    required
+                    style={transactionInputStyle}
+                  />
+                  <button type="submit" style={cancelButtonStyle}>
+                    Cancel Ticket
+                  </button>
+                </form>
               </div>
             </div>
 
@@ -392,4 +417,16 @@ const buttonStyle: React.CSSProperties = {
   cursor: "pointer",
   fontSize: "16px",
   marginTop: "20px",
+};
+
+const cancelButtonStyle: React.CSSProperties = {
+  width: "100%",
+  height: "40px",
+  backgroundColor: "#ff4d4d",
+  color: "white",
+  border: "none",
+  borderRadius: "5px",
+  cursor: "pointer",
+  fontSize: "16px",
+  marginTop: "10px",
 };
