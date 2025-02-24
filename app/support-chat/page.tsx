@@ -172,6 +172,13 @@ function ChatContent() {
     );
   }
 
+  // Define container animation style
+  const containerAnimationStyle: React.CSSProperties = {
+    opacity: containerLoaded ? 1 : 0,
+    transform: containerLoaded ? "translateY(0)" : "translateY(20px)",
+    transition: "opacity 0.5s ease-out, transform 0.5s ease-out",
+  };
+
   // Common function for sending a message
   const sendMessage = async (text: string) => {
     const trimmed = text.trim();
