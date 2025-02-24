@@ -7,7 +7,6 @@ import React, {
   useState,
   useRef,
   ChangeEvent,
-  FormEvent,
 } from "react";
 import { useParams } from "next/navigation";
 import { db } from "../../lib/firebase";
@@ -306,11 +305,10 @@ function ChatWidget({ userID }: ChatWidgetProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Auto-generated suggestions (only shown when conversation is empty)
+  // Auto-generated suggestions (only when conversation is empty)
   const suggestions = [
     "View Report Details",
     "Submit an Appeal",
@@ -319,17 +317,12 @@ function ChatWidget({ userID }: ChatWidgetProps) {
 
   useEffect(() => {
     if (!userID) return;
-
-    const messagesRef = collection(
-      db,
-      "messages"
-    ) as CollectionReference<ChatMessage>;
+    const messagesRef = collection(db, "messages") as CollectionReference<ChatMessage>;
     const q = query(
       messagesRef,
       where("transactionId", "==", userID),
       orderBy("timestamp", "asc")
     );
-
     const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<ChatMessage>) => {
       const msgs = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -337,7 +330,6 @@ function ChatWidget({ userID }: ChatWidgetProps) {
       }));
       setMessages(msgs);
     });
-
     return () => unsubscribe();
   }, [userID]);
 
@@ -420,14 +412,11 @@ function ChatWidget({ userID }: ChatWidgetProps) {
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          // Fixed standard height when open
           height: isOpen ? "450px" : "0px",
           opacity: isOpen ? 1 : 0,
           transform: isOpen ? "translateY(0)" : "translateY(20px)",
           pointerEvents: isOpen ? "auto" : "none",
-          transition:
-            "height 0.3s ease, opacity 0.3s ease, transform 0.3s ease",
-          // Hover effect to intensify the box shadow
+          transition: "height 0.3s ease, opacity 0.3s ease, transform 0.3s ease",
           boxShadow: isHovered
             ? "0 8px 16px rgba(0,0,0,0.3)"
             : "0 4px 8px rgba(0,0,0,0.2)",
@@ -478,7 +467,15 @@ function ChatWidget({ userID }: ChatWidgetProps) {
                   key={key}
                   style={isSupport ? chatBubbleBotStyle : chatBubbleUserStyle}
                 >
-                  {msg.text}
+                  {msg.text.startsWith("data:image") ? (
+                    <img
+                      src={msg.text}
+                      alt="sent image"
+                      style={{ maxWidth: "100%", borderRadius: "8px" }}
+                    />
+                  ) : (
+                    msg.text
+                  )}
                 </div>
               );
             })}
@@ -869,7 +866,6 @@ const plusIconBtnStyle: React.CSSProperties = {
   fontSize: "24px",
   cursor: "pointer",
   marginRight: "5px",
-  // add or adjust marginLeft as needed:
-  marginLeft: "10px",
+  marginLeft: "10px", // Adjust this value to change left alignment
   color: "#5865f2",
 };
