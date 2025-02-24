@@ -869,5 +869,7 @@ const plusIconBtnStyle: React.CSSProperties = {
   fontSize: "24px",
   cursor: "pointer",
   marginRight: "5px",
+  // add or adjust marginLeft as needed:
+  marginLeft: "10px",
   color: "#5865f2",
 };
