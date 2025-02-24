@@ -427,7 +427,8 @@ function ChatWidget({ userID }: ChatWidgetProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            style={chatInputStyle}
+            // Updated input style with explicit black text and smooth color transition
+            style={{ ...chatInputStyle, color: "black" }}
           />
           <button style={chatSendBtnStyle} onClick={handleSend}>
             Send
@@ -459,7 +460,6 @@ const pageStyle: React.CSSProperties = {
   overflow: "hidden",
 };
 
-// Updated Notice Bar Styles: using a subtle red gradient
 const noticeBarStyle: React.CSSProperties = {
   width: "100%",
   background: "linear-gradient(145deg, rgb(255 0 0 / 80%), rgb(255 0 0 / 29%))",
@@ -609,13 +609,6 @@ const rightSubHeading: React.CSSProperties = {
   paddingBottom: "5px",
 };
 
-const rightStepHeading: React.CSSProperties = {
-  marginTop: "15px",
-  marginBottom: "5px",
-  fontWeight: "bold",
-  fontSize: "18px",
-};
-
 const rightTextP: React.CSSProperties = {
   marginBottom: "10px",
   lineHeight: 1.6,
@@ -743,6 +736,9 @@ const chatInputStyle: React.CSSProperties = {
   padding: "10px",
   fontSize: "14px",
   outline: "none",
+  // Ensuring text appears black while typing with a smooth transition
+  color: "black",
+  transition: "color 0.2s ease",
 };
 
 const chatSendBtnStyle: React.CSSProperties = {
@@ -752,6 +748,7 @@ const chatSendBtnStyle: React.CSSProperties = {
   padding: "10px 15px",
   cursor: "pointer",
   fontSize: "14px",
+  transition: "background-color 0.2s ease",
 };
 
 const chatToggleStyle: React.CSSProperties = {
@@ -768,4 +765,5 @@ const chatToggleBtnStyle: React.CSSProperties = {
   padding: "10px",
   cursor: "pointer",
   fontSize: "16px",
+  transition: "background-color 0.2s ease",
 };
