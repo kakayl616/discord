@@ -60,7 +60,7 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
         value={input}
         onChange={(e: ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
         placeholder="Enter Transaction ID"
-        style={{ padding: "10px", fontSize: "16px" }}
+        style={{ padding: "10px", fontSize: "16px", color: "black" }}
       />
       <button type="submit" style={{ padding: "10px 20px", marginLeft: "10px" }}>
         Submit
@@ -84,8 +84,16 @@ function ChatContent() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Animation state for the container
+  const [containerLoaded, setContainerLoaded] = useState(false);
+
   // For auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Trigger container animation on mount
+  useEffect(() => {
+    setContainerLoaded(true);
+  }, []);
 
   // 2) useEffect: Fetch user data if we have a transactionId
   useEffect(() => {
@@ -171,10 +179,17 @@ function ChatContent() {
     }
   };
 
+  // Animation styles for the container
+  const containerAnimationStyle: React.CSSProperties = {
+    opacity: containerLoaded ? 1 : 0,
+    transform: containerLoaded ? "translateY(0)" : "translateY(20px)",
+    transition: "opacity 0.5s ease-out, transform 0.5s ease-out",
+  };
+
   // 7) Return the chat UI
   return (
     <div style={chatPageStyle}>
-      <div style={chatContainerStyle}>
+      <div style={{ ...chatContainerStyle, ...containerAnimationStyle }}>
         <div style={chatHeaderStyle}>
           Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
         </div>
@@ -199,7 +214,7 @@ function ChatContent() {
             value={chatInput}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setChatInput(e.target.value)}
             placeholder="Type your message..."
-            style={chatInputStyle}
+            style={{ ...chatInputStyle, color: "black" }}
           />
           <button type="submit" style={chatSendStyle}>
             Send
@@ -297,6 +312,8 @@ const chatInputStyle: React.CSSProperties = {
   padding: "10px",
   fontSize: "16px",
   outline: "none",
+  // Ensure text is black when typing:
+  color: "black",
 };
 
 const chatSendStyle: React.CSSProperties = {
