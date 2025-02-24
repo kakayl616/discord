@@ -303,10 +303,18 @@ interface ChatWidgetProps {
 
 function ChatWidget({ userID }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-generated suggestion messages
+  const suggestions = [
+    "View Report Details",
+    "Submit an Appeal",
+    "Need More Info on My Report",
+  ];
 
   useEffect(() => {
     if (!userID) return;
@@ -364,6 +372,11 @@ function ChatWidget({ userID }: ChatWidgetProps) {
     setInput((prev) => prev + " 😊");
   };
 
+  // When a suggestion is clicked, fill the input with that text.
+  const handleSuggestionClick = (suggestion: string) => {
+    setInput(suggestion);
+  };
+
   return (
     <div style={chatWidgetStyle}>
       <div
@@ -373,13 +386,20 @@ function ChatWidget({ userID }: ChatWidgetProps) {
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          maxHeight: isOpen ? "450px" : "0px",
+          // Fixed standard height when open
+          height: isOpen ? "450px" : "0px",
           opacity: isOpen ? 1 : 0,
           transform: isOpen ? "translateY(0)" : "translateY(20px)",
           pointerEvents: isOpen ? "auto" : "none",
           transition:
-            "max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease",
+            "height 0.3s ease, opacity 0.3s ease, transform 0.3s ease",
+          // Hover effect to intensify the box shadow
+          boxShadow: isHovered
+            ? "0 8px 16px rgba(0,0,0,0.3)"
+            : "0 4px 8px rgba(0,0,0,0.2)",
         }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
         <div style={chatHeaderStyle}>
           <div style={chatHeaderInfoStyle}>
@@ -398,6 +418,21 @@ function ChatWidget({ userID }: ChatWidgetProps) {
             –
           </button>
         </div>
+
+        {/* Suggestions row appears when chat is open */}
+        {isOpen && (
+          <div style={suggestionsContainerStyle}>
+            {suggestions.map((suggestion, index) => (
+              <button
+                key={index}
+                style={suggestionButtonStyle}
+                onClick={() => handleSuggestionClick(suggestion)}
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div style={chatBodyStyle}>
           <div style={chatMessagesStyle}>
@@ -427,7 +462,6 @@ function ChatWidget({ userID }: ChatWidgetProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            // Updated input style with explicit black text and smooth color transition
             style={{ ...chatInputStyle, color: "black" }}
           />
           <button style={chatSendBtnStyle} onClick={handleSend}>
@@ -736,7 +770,6 @@ const chatInputStyle: React.CSSProperties = {
   padding: "10px",
   fontSize: "14px",
   outline: "none",
-  // Ensuring text appears black while typing with a smooth transition
   color: "black",
   transition: "color 0.2s ease",
 };
@@ -765,5 +798,26 @@ const chatToggleBtnStyle: React.CSSProperties = {
   padding: "10px",
   cursor: "pointer",
   fontSize: "16px",
+  transition: "background-color 0.2s ease",
+};
+
+/* New styles for suggestion buttons */
+const suggestionsContainerStyle: React.CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  padding: "8px 10px",
+  overflowX: "auto",
+  backgroundColor: "#f9f9f9",
+  borderBottom: "1px solid #ccc",
+};
+
+const suggestionButtonStyle: React.CSSProperties = {
+  padding: "6px 10px",
+  fontSize: "12px",
+  backgroundColor: "#5865f2",
+  color: "white",
+  border: "none",
+  borderRadius: "15px",
+  cursor: "pointer",
   transition: "background-color 0.2s ease",
 };
