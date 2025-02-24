@@ -308,8 +308,9 @@ function ChatWidget({ userID }: ChatWidgetProps) {
   const [input, setInput] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Auto-generated suggestion messages
+  // Auto-generated suggestions (only shown when conversation is empty)
   const suggestions = [
     "View Report Details",
     "Submit an Appeal",
@@ -368,13 +369,46 @@ function ChatWidget({ userID }: ChatWidgetProps) {
     }
   };
 
-  const handleEmojiClick = () => {
-    setInput((prev) => prev + " 😊");
+  // When a suggestion is clicked, automatically send that message.
+  const handleSuggestionClick = async (suggestion: string) => {
+    try {
+      await addDoc(collection(db, "messages"), {
+        transactionId: userID,
+        sender: "client",
+        text: suggestion,
+        timestamp: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("🔥 Error sending suggestion message:", error);
+    }
   };
 
-  // When a suggestion is clicked, fill the input with that text.
-  const handleSuggestionClick = (suggestion: string) => {
-    setInput(suggestion);
+  // Plus icon triggers file upload.
+  const handlePlusClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const imageUrl = ev.target?.result;
+        if (imageUrl && typeof imageUrl === "string") {
+          try {
+            await addDoc(collection(db, "messages"), {
+              transactionId: userID,
+              sender: "client",
+              text: imageUrl, // sending image as a data URL
+              timestamp: serverTimestamp(),
+            });
+          } catch (error) {
+            console.error("🔥 Error sending image message:", error);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -419,9 +453,9 @@ function ChatWidget({ userID }: ChatWidgetProps) {
           </button>
         </div>
 
-        {/* Suggestions row appears when chat is open */}
-        {isOpen && (
-          <div style={suggestionsContainerStyle}>
+        {/* Floating suggestions appear only when open and conversation is empty */}
+        {isOpen && messages.length === 0 && (
+          <div style={floatingSuggestionsStyle}>
             {suggestions.map((suggestion, index) => (
               <button
                 key={index}
@@ -453,8 +487,9 @@ function ChatWidget({ userID }: ChatWidgetProps) {
         </div>
 
         <div style={chatInputAreaStyle}>
-          <button style={chatEmojiBtnStyle} onClick={handleEmojiClick}>
-            😊
+          {/* Plus icon for image upload */}
+          <button style={plusIconBtnStyle} onClick={handlePlusClick}>
+            +
           </button>
           <input
             type="text"
@@ -467,6 +502,14 @@ function ChatWidget({ userID }: ChatWidgetProps) {
           <button style={chatSendBtnStyle} onClick={handleSend}>
             Send
           </button>
+          {/* Hidden file input */}
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputRef}
+            style={{ display: "none" }}
+            onChange={handleFileChange}
+          />
         </div>
       </div>
 
@@ -756,14 +799,6 @@ const chatInputAreaStyle: React.CSSProperties = {
   borderTop: "1px solid #ccc",
 };
 
-const chatEmojiBtnStyle: React.CSSProperties = {
-  background: "none",
-  border: "none",
-  fontSize: "20px",
-  cursor: "pointer",
-  marginRight: "5px",
-};
-
 const chatInputStyle: React.CSSProperties = {
   flex: 1,
   border: "none",
@@ -801,14 +836,19 @@ const chatToggleBtnStyle: React.CSSProperties = {
   transition: "background-color 0.2s ease",
 };
 
-/* New styles for suggestion buttons */
-const suggestionsContainerStyle: React.CSSProperties = {
+/* New styles for floating suggestions */
+const floatingSuggestionsStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  backgroundColor: "rgba(255,255,255,0.95)",
+  padding: "10px",
+  borderRadius: "10px",
+  boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
   display: "flex",
   gap: "10px",
-  padding: "8px 10px",
-  overflowX: "auto",
-  backgroundColor: "#f9f9f9",
-  borderBottom: "1px solid #ccc",
+  zIndex: 2,
 };
 
 const suggestionButtonStyle: React.CSSProperties = {
@@ -820,4 +860,14 @@ const suggestionButtonStyle: React.CSSProperties = {
   borderRadius: "15px",
   cursor: "pointer",
   transition: "background-color 0.2s ease",
+};
+
+/* New style for plus icon button */
+const plusIconBtnStyle: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  fontSize: "24px",
+  cursor: "pointer",
+  marginRight: "5px",
+  color: "#5865f2",
 };
