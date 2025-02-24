@@ -1,6 +1,13 @@
 "use client";
 
-import React, { Suspense, useState, useEffect, ChangeEvent, FormEvent, useRef } from "react";
+import React, {
+  Suspense,
+  useState,
+  useEffect,
+  ChangeEvent,
+  FormEvent,
+  useRef,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import {
   collection,
@@ -70,24 +77,29 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
 }
 
 // ---------------------------
-// ChatContent Component (Inner Component)
-// Contains all logic that uses useSearchParams and Firebase hooks
+// ChatContent Component
 // ---------------------------
 function ChatContent() {
   const searchParams = useSearchParams();
   const initialTx = searchParams.get("tx") || "";
 
-  // 1) Define hooks at the top
+  // Main state for chat
   const [transactionId, setTransactionId] = useState(initialTx);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // Animation state for the container
   const [containerLoaded, setContainerLoaded] = useState(false);
 
-  // For auto-scrolling
+  // States for pre-composed messages
+  const [preComposedMessages, setPreComposedMessages] = useState<string[]>([
+    "Hello, how can I help you today?",
+    "Please provide more details.",
+    "I'll look into that for you.",
+  ]);
+  const [newPreComposedMessage, setNewPreComposedMessage] = useState("");
+
+  // For auto-scrolling messages
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // Trigger container animation on mount
@@ -95,7 +107,7 @@ function ChatContent() {
     setContainerLoaded(true);
   }, []);
 
-  // 2) useEffect: Fetch user data if we have a transactionId
+  // Fetch user data based on transactionId
   useEffect(() => {
     async function fetchUserData() {
       setLoading(true);
@@ -118,9 +130,9 @@ function ChatContent() {
     }
   }, [transactionId]);
 
-  // 3) useEffect: Listen for chat messages in Firestore
+  // Listen for chat messages in Firestore
   useEffect(() => {
-    if (!transactionId) return; // no subscription if empty
+    if (!transactionId) return;
 
     const messagesRef = collection(db, "messages") as CollectionReference<Message>;
     const q = query(
@@ -140,14 +152,14 @@ function ChatContent() {
     return () => unsubscribe();
   }, [transactionId]);
 
-  // 4) useEffect: Auto-scroll on messages change
+  // Auto-scroll on new messages
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
-  // 5) Conditional rendering after all hooks are defined
+  // If no transaction ID, show the transaction form
   if (!transactionId || transactionId === "support-chat") {
     return <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />;
   }
@@ -160,12 +172,10 @@ function ChatContent() {
     );
   }
 
-  // 6) Handler for sending a message
-  const handleSend = async (e: FormEvent) => {
-    e.preventDefault();
-    const trimmed = chatInput.trim();
+  // Common function for sending a message
+  const sendMessage = async (text: string) => {
+    const trimmed = text.trim();
     if (!trimmed) return;
-
     try {
       await addDoc(collection(db, "messages"), {
         transactionId,
@@ -173,53 +183,117 @@ function ChatContent() {
         text: trimmed,
         timestamp: serverTimestamp(),
       });
-      setChatInput("");
     } catch (error) {
       console.error("Error sending message:", error);
     }
   };
 
-  // Animation styles for the container
-  const containerAnimationStyle: React.CSSProperties = {
-    opacity: containerLoaded ? 1 : 0,
-    transform: containerLoaded ? "translateY(0)" : "translateY(20px)",
-    transition: "opacity 0.5s ease-out, transform 0.5s ease-out",
+  // Handler for chat input form submission
+  const handleSend = async (e: FormEvent) => {
+    e.preventDefault();
+    await sendMessage(chatInput);
+    setChatInput("");
   };
 
-  // 7) Return the chat UI
+  // Handler for sending a pre-composed message
+  const handlePreComposedSend = async (message: string) => {
+    await sendMessage(message);
+  };
+
+  // Handler for adding a new pre-composed message to the list
+  const handleAddPreComposedMessage = () => {
+    const trimmed = newPreComposedMessage.trim();
+    if (trimmed) {
+      setPreComposedMessages((prev) => [...prev, trimmed]);
+      setNewPreComposedMessage("");
+    }
+  };
+
+  // Helper function to render message content (checks for image strings)
+  const renderMessageContent = (msg: Message) => {
+    if (msg.text.startsWith("data:image/")) {
+      return (
+        <img
+          src={msg.text}
+          alt="Uploaded"
+          style={{ maxWidth: "100%", borderRadius: "10px", marginTop: "5px" }}
+        />
+      );
+    }
+    return <span>{msg.text}</span>;
+  };
+
   return (
     <div style={chatPageStyle}>
-      <div style={{ ...chatContainerStyle, ...containerAnimationStyle }}>
-        <div style={chatHeaderStyle}>
-          Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
+      <div style={{ ...chatWrapperStyle, ...containerAnimationStyle }}>
+        {/* Main Chat Container */}
+        <div style={chatContainerStyle}>
+          <div style={chatHeaderStyle}>
+            Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
+          </div>
+
+          {/* Chat Messages */}
+          <div style={chatMessagesStyle}>
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                style={
+                  msg.sender === "support"
+                    ? supportMessageStyle
+                    : clientMessageStyle
+                }
+              >
+                <strong>{msg.sender}:</strong> {renderMessageContent(msg)}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Chat Input */}
+          <form onSubmit={handleSend} style={chatInputContainerStyle}>
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setChatInput(e.target.value)
+              }
+              placeholder="Type your message..."
+              style={{ ...chatInputStyle, color: "black" }}
+            />
+            <button type="submit" style={chatSendStyle}>
+              Send
+            </button>
+          </form>
         </div>
 
-        {/* Messages area */}
-        <div style={chatMessagesStyle}>
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              style={msg.sender === "support" ? supportMessageStyle : clientMessageStyle}
+        {/* Sidebar for Pre-composed Messages */}
+        <div style={sidebarStyle}>
+          <h3>Pre-composed Messages</h3>
+          {preComposedMessages.map((msg, index) => (
+            <button
+              key={index}
+              onClick={() => handlePreComposedSend(msg)}
+              style={preComposedButtonStyle}
             >
-              {msg.sender}: {msg.text}
-            </div>
+              {msg}
+            </button>
           ))}
-          <div ref={messagesEndRef} />
+          <div style={{ marginTop: "20px" }}>
+            <input
+              type="text"
+              value={newPreComposedMessage}
+              onChange={(e) => setNewPreComposedMessage(e.target.value)}
+              placeholder="Add new message"
+              style={preComposedInputStyle}
+            />
+            <button
+              onClick={handleAddPreComposedMessage}
+              style={preComposedAddButtonStyle}
+            >
+              Add
+            </button>
+          </div>
         </div>
-
-        {/* Input area */}
-        <form onSubmit={handleSend} style={chatInputContainerStyle}>
-          <input
-            type="text"
-            value={chatInput}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setChatInput(e.target.value)}
-            placeholder="Type your message..."
-            style={{ ...chatInputStyle, color: "black" }}
-          />
-          <button type="submit" style={chatSendStyle}>
-            Send
-          </button>
-        </form>
       </div>
     </div>
   );
@@ -230,7 +304,11 @@ function ChatContent() {
 // ---------------------------
 export default function SupportChat() {
   return (
-    <Suspense fallback={<div style={{ textAlign: "center", marginTop: "50px" }}>Loading chat...</div>}>
+    <Suspense
+      fallback={
+        <div style={{ textAlign: "center", marginTop: "50px" }}>Loading chat...</div>
+      }
+    >
       <ChatContent />
     </Suspense>
   );
@@ -249,23 +327,38 @@ const chatPageStyle: React.CSSProperties = {
   height: "100vh",
 };
 
+// Wrapper to hold both chat container and sidebar
+const chatWrapperStyle: React.CSSProperties = {
+  display: "flex",
+  width: "800px",
+  height: "600px",
+  boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+};
+
+// Chat container (left side)
 const chatContainerStyle: React.CSSProperties = {
   width: "500px",
-  height: "600px",
+  height: "100%",
   backgroundColor: "white",
-  border: "1px solid #ccc",
-  borderRadius: "10px",
-  boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
+};
+
+// Sidebar (right side)
+const sidebarStyle: React.CSSProperties = {
+  width: "300px",
+  padding: "10px",
+  backgroundColor: "#f9f9f9",
+  borderLeft: "1px solid #ccc",
+  display: "flex",
+  flexDirection: "column",
 };
 
 const chatHeaderStyle: React.CSSProperties = {
   backgroundColor: "#5865f2",
   color: "white",
   padding: "15px",
-  borderRadius: "10px 10px 0 0",
   textAlign: "center",
   fontSize: "18px",
 };
@@ -312,7 +405,6 @@ const chatInputStyle: React.CSSProperties = {
   padding: "10px",
   fontSize: "16px",
   outline: "none",
-  // Ensure text is black when typing:
   color: "black",
 };
 
@@ -323,4 +415,24 @@ const chatSendStyle: React.CSSProperties = {
   padding: "10px 20px",
   cursor: "pointer",
   fontSize: "16px",
+};
+
+// Styles for pre-composed messages buttons and input
+const preComposedButtonStyle: React.CSSProperties = {
+  marginBottom: "10px",
+  padding: "10px",
+  fontSize: "14px",
+  cursor: "pointer",
+};
+
+const preComposedInputStyle: React.CSSProperties = {
+  width: "calc(100% - 60px)",
+  padding: "8px",
+  fontSize: "14px",
+};
+
+const preComposedAddButtonStyle: React.CSSProperties = {
+  padding: "8px 12px",
+  marginLeft: "8px",
+  cursor: "pointer",
 };
