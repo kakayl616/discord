@@ -16,6 +16,8 @@ import {
   orderBy,
   onSnapshot,
   addDoc,
+  updateDoc,
+  deleteDoc,
   serverTimestamp,
   Timestamp,
   QuerySnapshot,
@@ -91,13 +93,17 @@ function ChatContent() {
   const [loading, setLoading] = useState(false);
   const [containerLoaded, setContainerLoaded] = useState(false);
 
-  // States for pre-composed messages
+  // State for pre-composed messages
   const [preComposedMessages, setPreComposedMessages] = useState<string[]>([
     "Hello, how can I help you today?",
     "Please provide more details.",
     "I'll look into that for you.",
   ]);
   const [newPreComposedMessage, setNewPreComposedMessage] = useState("");
+
+  // State for editing a message
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingMessageText, setEditingMessageText] = useState("");
 
   // For auto-scrolling messages
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -179,7 +185,9 @@ function ChatContent() {
     transition: "opacity 0.5s ease-out, transform 0.5s ease-out",
   };
 
-  // Common function for sending a message
+  // ---------------------------
+  // Message CRUD functions
+  // ---------------------------
   const sendMessage = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -195,19 +203,16 @@ function ChatContent() {
     }
   };
 
-  // Handler for chat input form submission
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
     await sendMessage(chatInput);
     setChatInput("");
   };
 
-  // Handler for sending a pre-composed message
   const handlePreComposedSend = async (message: string) => {
     await sendMessage(message);
   };
 
-  // Handler for adding a new pre-composed message to the list
   const handleAddPreComposedMessage = () => {
     const trimmed = newPreComposedMessage.trim();
     if (trimmed) {
@@ -216,8 +221,62 @@ function ChatContent() {
     }
   };
 
-  // Helper function to render message content (checks for image strings)
+  // Editing a message
+  const handleEditClick = (msg: Message) => {
+    setEditingMessageId(msg.id || null);
+    setEditingMessageText(msg.text);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingMessageText("");
+  };
+
+  const handleSaveEdit = async (msg: Message) => {
+    if (!msg.id) return;
+    try {
+      const messageRef = doc(db, "messages", msg.id);
+      await updateDoc(messageRef, { text: editingMessageText });
+      setEditingMessageId(null);
+      setEditingMessageText("");
+    } catch (error) {
+      console.error("Error updating message:", error);
+    }
+  };
+
+  // Deleting a message
+  const handleDeleteMessage = async (msg: Message) => {
+    if (!msg.id) return;
+    try {
+      await deleteDoc(doc(db, "messages", msg.id));
+    } catch (error) {
+      console.error("Error deleting message:", error);
+    }
+  };
+
+  // Render message content with support for image strings or editing mode
   const renderMessageContent = (msg: Message) => {
+    if (editingMessageId === msg.id) {
+      return (
+        <div>
+          <input
+            type="text"
+            value={editingMessageText}
+            onChange={(e) => setEditingMessageText(e.target.value)}
+            style={{ ...chatInputStyle, marginBottom: "5px" }}
+          />
+          <div>
+            <button onClick={() => handleSaveEdit(msg)} style={preComposedButtonStyle}>
+              Save
+            </button>
+            <button onClick={handleCancelEdit} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     if (msg.text.startsWith("data:image/")) {
       return (
         <img
@@ -233,7 +292,7 @@ function ChatContent() {
   return (
     <div style={chatPageStyle}>
       <div style={{ ...chatWrapperStyle, ...containerAnimationStyle }}>
-        {/* Main Chat Container */}
+        {/* Chat Container */}
         <div style={chatContainerStyle}>
           <div style={chatHeaderStyle}>
             Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
@@ -244,13 +303,20 @@ function ChatContent() {
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                style={
-                  msg.sender === "support"
-                    ? supportMessageStyle
-                    : clientMessageStyle
-                }
+                style={msg.sender === "support" ? supportMessageStyle : clientMessageStyle}
               >
                 <strong>{msg.sender}:</strong> {renderMessageContent(msg)}
+                {/* Only show edit/delete buttons for support messages when not editing */}
+                {msg.sender === "support" && editingMessageId !== msg.id && (
+                  <div style={{ marginTop: "5px" }}>
+                    <button onClick={() => handleEditClick(msg)} style={preComposedButtonStyle}>
+                      Edit
+                    </button>
+                    <button onClick={() => handleDeleteMessage(msg)} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
+                      Delete
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             <div ref={messagesEndRef} />
@@ -261,9 +327,7 @@ function ChatContent() {
             <input
               type="text"
               value={chatInput}
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                setChatInput(e.target.value)
-              }
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setChatInput(e.target.value)}
               placeholder="Type your message..."
               style={{ ...chatInputStyle, color: "black" }}
             />
@@ -293,10 +357,7 @@ function ChatContent() {
               placeholder="Add new message"
               style={preComposedInputStyle}
             />
-            <button
-              onClick={handleAddPreComposedMessage}
-              style={preComposedAddButtonStyle}
-            >
+            <button onClick={handleAddPreComposedMessage} style={preComposedAddButtonStyle}>
               Add
             </button>
           </div>
@@ -311,11 +372,7 @@ function ChatContent() {
 // ---------------------------
 export default function SupportChat() {
   return (
-    <Suspense
-      fallback={
-        <div style={{ textAlign: "center", marginTop: "50px" }}>Loading chat...</div>
-      }
-    >
+    <Suspense fallback={<div style={{ textAlign: "center", marginTop: "50px" }}>Loading chat...</div>}>
       <ChatContent />
     </Suspense>
   );
@@ -334,7 +391,6 @@ const chatPageStyle: React.CSSProperties = {
   height: "100vh",
 };
 
-// Wrapper to hold both chat container and sidebar
 const chatWrapperStyle: React.CSSProperties = {
   display: "flex",
   width: "800px",
@@ -342,7 +398,6 @@ const chatWrapperStyle: React.CSSProperties = {
   boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
 };
 
-// Chat container (left side)
 const chatContainerStyle: React.CSSProperties = {
   width: "500px",
   height: "100%",
@@ -352,7 +407,6 @@ const chatContainerStyle: React.CSSProperties = {
   overflow: "hidden",
 };
 
-// Sidebar (right side)
 const sidebarStyle: React.CSSProperties = {
   width: "300px",
   padding: "10px",
@@ -424,7 +478,6 @@ const chatSendStyle: React.CSSProperties = {
   fontSize: "16px",
 };
 
-// Styles for pre-composed messages buttons and input
 const preComposedButtonStyle: React.CSSProperties = {
   marginBottom: "10px",
   padding: "10px",
