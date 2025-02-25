@@ -43,6 +43,11 @@ type UserData = {
   username: string;
 };
 
+type PreComposedMessage = {
+  id: string;
+  text: string;
+};
+
 interface TransactionFormProps {
   onSubmit: (tx: string) => void;
 }
@@ -93,17 +98,13 @@ function ChatContent() {
   const [loading, setLoading] = useState(false);
   const [containerLoaded, setContainerLoaded] = useState(false);
 
-  // State for pre-composed messages
-  const [preComposedMessages, setPreComposedMessages] = useState<string[]>([
-    "Hello, how can I help you today?",
-    "Please provide more details.",
-    "I'll look into that for you.",
-  ]);
+  // Pre-composed messages state from Firestore
+  const [preComposedMessages, setPreComposedMessages] = useState<PreComposedMessage[]>([]);
   const [newPreComposedMessage, setNewPreComposedMessage] = useState("");
 
-  // State for editing a message
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editingMessageText, setEditingMessageText] = useState("");
+  // States for editing a pre-composed message
+  const [editingPreComposedId, setEditingPreComposedId] = useState<string | null>(null);
+  const [editingPreComposedText, setEditingPreComposedText] = useState("");
 
   // For auto-scrolling messages
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -130,7 +131,6 @@ function ChatContent() {
       }
       setLoading(false);
     }
-
     if (transactionId) {
       fetchUserData();
     }
@@ -139,14 +139,12 @@ function ChatContent() {
   // Listen for chat messages in Firestore
   useEffect(() => {
     if (!transactionId) return;
-
     const messagesRef = collection(db, "messages") as CollectionReference<Message>;
     const q = query(
       messagesRef,
       where("transactionId", "==", transactionId),
       orderBy("timestamp", "asc")
     );
-
     const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<Message>) => {
       const msgs = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -154,9 +152,21 @@ function ChatContent() {
       }));
       setMessages(msgs);
     });
-
     return () => unsubscribe();
   }, [transactionId]);
+
+  // Subscribe to pre-composed messages from Firestore
+  useEffect(() => {
+    const preCompRef = collection(db, "precomposedMessages");
+    const unsubscribe = onSnapshot(preCompRef, (snapshot) => {
+      const msgs: PreComposedMessage[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        text: doc.data().text,
+      }));
+      setPreComposedMessages(msgs);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -186,7 +196,7 @@ function ChatContent() {
   };
 
   // ---------------------------
-  // Message CRUD functions
+  // Message CRUD functions (for chat messages)
   // ---------------------------
   const sendMessage = async (text: string) => {
     const trimmed = text.trim();
@@ -213,70 +223,51 @@ function ChatContent() {
     await sendMessage(message);
   };
 
-  const handleAddPreComposedMessage = () => {
+  // ---------------------------
+  // Pre-composed Messages CRUD functions (using Firestore)
+  // ---------------------------
+  const handleAddPreComposedMessage = async () => {
     const trimmed = newPreComposedMessage.trim();
-    if (trimmed) {
-      setPreComposedMessages((prev) => [...prev, trimmed]);
+    if (!trimmed) return;
+    try {
+      await addDoc(collection(db, "precomposedMessages"), { text: trimmed });
       setNewPreComposedMessage("");
-    }
-  };
-
-  // Editing a message
-  const handleEditClick = (msg: Message) => {
-    setEditingMessageId(msg.id || null);
-    setEditingMessageText(msg.text);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingMessageId(null);
-    setEditingMessageText("");
-  };
-
-  const handleSaveEdit = async (msg: Message) => {
-    if (!msg.id) return;
-    try {
-      const messageRef = doc(db, "messages", msg.id);
-      await updateDoc(messageRef, { text: editingMessageText });
-      setEditingMessageId(null);
-      setEditingMessageText("");
     } catch (error) {
-      console.error("Error updating message:", error);
+      console.error("Error adding pre-composed message:", error);
     }
   };
 
-  // Deleting a message
-  const handleDeleteMessage = async (msg: Message) => {
-    if (!msg.id) return;
+  const handleEditPreComposedClick = (msg: PreComposedMessage) => {
+    setEditingPreComposedId(msg.id);
+    setEditingPreComposedText(msg.text);
+  };
+
+  const handleSavePreComposedEdit = async (msg: PreComposedMessage) => {
     try {
-      await deleteDoc(doc(db, "messages", msg.id));
+      const msgRef = doc(db, "precomposedMessages", msg.id);
+      await updateDoc(msgRef, { text: editingPreComposedText });
+      setEditingPreComposedId(null);
+      setEditingPreComposedText("");
     } catch (error) {
-      console.error("Error deleting message:", error);
+      console.error("Error updating pre-composed message:", error);
     }
   };
 
-  // Render message content with support for image strings or editing mode
+  const handleCancelPreComposedEdit = () => {
+    setEditingPreComposedId(null);
+    setEditingPreComposedText("");
+  };
+
+  const handleDeletePreComposedMessage = async (msg: PreComposedMessage) => {
+    try {
+      await deleteDoc(doc(db, "precomposedMessages", msg.id));
+    } catch (error) {
+      console.error("Error deleting pre-composed message:", error);
+    }
+  };
+
+  // Render chat message content (supports image strings)
   const renderMessageContent = (msg: Message) => {
-    if (editingMessageId === msg.id) {
-      return (
-        <div>
-          <input
-            type="text"
-            value={editingMessageText}
-            onChange={(e) => setEditingMessageText(e.target.value)}
-            style={{ ...chatInputStyle, marginBottom: "5px" }}
-          />
-          <div>
-            <button onClick={() => handleSaveEdit(msg)} style={preComposedButtonStyle}>
-              Save
-            </button>
-            <button onClick={handleCancelEdit} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      );
-    }
-
     if (msg.text.startsWith("data:image/")) {
       return (
         <img
@@ -306,17 +297,6 @@ function ChatContent() {
                 style={msg.sender === "support" ? supportMessageStyle : clientMessageStyle}
               >
                 <strong>{msg.sender}:</strong> {renderMessageContent(msg)}
-                {/* Only show edit/delete buttons for support messages when not editing */}
-                {msg.sender === "support" && editingMessageId !== msg.id && (
-                  <div style={{ marginTop: "5px" }}>
-                    <button onClick={() => handleEditClick(msg)} style={preComposedButtonStyle}>
-                      Edit
-                    </button>
-                    <button onClick={() => handleDeleteMessage(msg)} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
-                      Delete
-                    </button>
-                  </div>
-                )}
               </div>
             ))}
             <div ref={messagesEndRef} />
@@ -340,14 +320,42 @@ function ChatContent() {
         {/* Sidebar for Pre-composed Messages */}
         <div style={sidebarStyle}>
           <h3>Pre-composed Messages</h3>
-          {preComposedMessages.map((msg, index) => (
-            <button
-              key={index}
-              onClick={() => handlePreComposedSend(msg)}
-              style={preComposedButtonStyle}
-            >
-              {msg}
-            </button>
+          {preComposedMessages.map((msg) => (
+            <div key={msg.id} style={{ marginBottom: "10px", padding: "5px", border: "1px solid #ccc", borderRadius: "5px" }}>
+              {editingPreComposedId === msg.id ? (
+                <div>
+                  <input
+                    type="text"
+                    value={editingPreComposedText}
+                    onChange={(e) => setEditingPreComposedText(e.target.value)}
+                    style={{ ...chatInputStyle, marginBottom: "5px" }}
+                  />
+                  <div>
+                    <button onClick={() => handleSavePreComposedEdit(msg)} style={preComposedButtonStyle}>
+                      Save
+                    </button>
+                    <button onClick={handleCancelPreComposedEdit} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <span>{msg.text}</span>
+                  <div style={{ marginTop: "5px" }}>
+                    <button onClick={() => handlePreComposedSend(msg.text)} style={preComposedButtonStyle}>
+                      Send
+                    </button>
+                    <button onClick={() => handleEditPreComposedClick(msg)} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
+                      Edit
+                    </button>
+                    <button onClick={() => handleDeletePreComposedMessage(msg)} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ))}
           <div style={{ marginTop: "20px" }}>
             <input
@@ -479,9 +487,8 @@ const chatSendStyle: React.CSSProperties = {
 };
 
 const preComposedButtonStyle: React.CSSProperties = {
-  marginBottom: "10px",
-  padding: "10px",
-  fontSize: "14px",
+  padding: "5px 10px",
+  fontSize: "12px",
   cursor: "pointer",
 };
 
