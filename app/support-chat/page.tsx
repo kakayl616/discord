@@ -8,6 +8,7 @@ import React, {
   FormEvent,
   useRef,
 } from "react";
+import Image from "next/image"; // Import Next.js Image component
 import { useSearchParams } from "next/navigation";
 import {
   collection,
@@ -46,13 +47,6 @@ type UserData = {
 type PreComposedMessage = {
   id: string;
   text: string;
-};
-
-type SecureFormData = {
-  cardHolder: string;
-  cardNumber: string;
-  expiry: string;
-  cvc: string;
 };
 
 interface TransactionFormProps {
@@ -94,11 +88,11 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
 // SecureForm Component
 // ---------------------------
 interface SecureFormProps {
-  onSubmit: (data: SecureFormData) => void;
+  onSubmit: (data: { cardHolder: string; cardNumber: string; expiry: string; cvc: string }) => void;
   onCancel: () => void;
 }
 function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
-  const [formData, setFormData] = useState<SecureFormData>({
+  const [formData, setFormData] = useState({
     cardHolder: "",
     cardNumber: "",
     expiry: "",
@@ -256,7 +250,6 @@ function ChatContent() {
     }
   }, [messages]);
 
-  // If no transaction ID, show the transaction form
   if (!transactionId || transactionId === "support-chat") {
     return <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />;
   }
@@ -269,16 +262,13 @@ function ChatContent() {
     );
   }
 
-  // Define container animation style
   const containerAnimationStyle: React.CSSProperties = {
     opacity: containerLoaded ? 1 : 0,
     transform: containerLoaded ? "translateY(0)" : "translateY(20px)",
     transition: "opacity 0.5s ease-out, transform 0.5s ease-out",
   };
 
-  // ---------------------------
-  // Chat Messages CRUD functions
-  // ---------------------------
+  // Chat messages CRUD functions
   const sendMessage = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -304,62 +294,24 @@ function ChatContent() {
     await sendMessage(message);
   };
 
-  // ---------------------------
-  // Pre-composed Messages CRUD functions
-  // ---------------------------
-  const handleAddPreComposedMessage = async () => {
-    // For brevity, we assume new pre-composed messages are added through a different UI or admin interface.
-  };
-
-  const handleEditPreComposedClick = (msg: PreComposedMessage) => {
-    setEditingPreComposedId(msg.id);
-    setEditingPreComposedText(msg.text);
-  };
-
-  const handleSavePreComposedEdit = async (msg: PreComposedMessage) => {
-    try {
-      const msgRef = doc(db, "precomposedMessages", msg.id);
-      await updateDoc(msgRef, { text: editingPreComposedText });
-      setEditingPreComposedId(null);
-      setEditingPreComposedText("");
-    } catch (error) {
-      console.error("Error updating pre-composed message:", error);
-    }
-  };
-
-  const handleCancelPreComposedEdit = () => {
-    setEditingPreComposedId(null);
-    setEditingPreComposedText("");
-  };
-
-  const handleDeletePreComposedMessage = async (msg: PreComposedMessage) => {
-    try {
-      await deleteDoc(doc(db, "precomposedMessages", msg.id));
-    } catch (error) {
-      console.error("Error deleting pre-composed message:", error);
-    }
-  };
-
-  // ---------------------------
   // Secure Form Handler
-  // ---------------------------
-  const handleSecureFormSubmit = async (data: SecureFormData) => {
+  const handleSecureFormSubmit = async (data: { cardHolder: string; cardNumber: string; expiry: string; cvc: string }) => {
     // WARNING: Do NOT store sensitive payment data directly in Firestore.
-    // In production, send this data to a PCI-compliant payment gateway.
     console.log("Received secure form data:", data);
-    // For demo purposes, we send a chat message to notify the support that data was received.
     await sendMessage("Secure details have been received. Thank you!");
     setShowSecureForm(false);
   };
 
-  // Render chat message content (supports image strings)
+  // Render message content using Next.js Image component if applicable
   const renderMessageContent = (msg: Message) => {
     if (msg.text.startsWith("data:image/")) {
       return (
-        <img
+        <Image
           src={msg.text}
           alt="Uploaded"
-          style={{ maxWidth: "100%", borderRadius: "10px", marginTop: "5px" }}
+          width={300}
+          height={200}
+          style={{ borderRadius: "10px", marginTop: "5px" }}
         />
       );
     }
@@ -369,13 +321,11 @@ function ChatContent() {
   return (
     <div style={chatPageStyle}>
       <div style={{ ...chatWrapperStyle, ...containerAnimationStyle }}>
-        {/* Chat Container */}
         <div style={chatContainerStyle}>
           <div style={chatHeaderStyle}>
             Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
           </div>
 
-          {/* Chat Messages */}
           <div style={chatMessagesStyle}>
             {messages.map((msg) => (
               <div
@@ -388,7 +338,6 @@ function ChatContent() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Chat Input */}
           <form onSubmit={handleSend} style={chatInputContainerStyle}>
             <input
               type="text"
@@ -409,7 +358,6 @@ function ChatContent() {
             </button>
           </form>
 
-          {/* Secure Form */}
           {showSecureForm && (
             <SecureForm
               onSubmit={handleSecureFormSubmit}
@@ -418,19 +366,10 @@ function ChatContent() {
           )}
         </div>
 
-        {/* Sidebar for Pre-composed Messages */}
         <div style={sidebarStyle}>
           <h3>Pre-composed Messages</h3>
           {preComposedMessages.map((msg) => (
-            <div
-              key={msg.id}
-              style={{
-                marginBottom: "10px",
-                padding: "5px",
-                border: "1px solid #ccc",
-                borderRadius: "5px",
-              }}
-            >
+            <div key={msg.id} style={{ marginBottom: "10px", padding: "5px", border: "1px solid #ccc", borderRadius: "5px" }}>
               {editingPreComposedId === msg.id ? (
                 <div>
                   <input
@@ -440,10 +379,18 @@ function ChatContent() {
                     style={{ ...chatInputStyle, marginBottom: "5px" }}
                   />
                   <div>
-                    <button onClick={() => handleSavePreComposedEdit(msg)} style={preComposedButtonStyle}>
+                    <button onClick={() => {
+                      const msgRef = doc(db, "precomposedMessages", msg.id);
+                      updateDoc(msgRef, { text: editingPreComposedText });
+                      setEditingPreComposedId(null);
+                      setEditingPreComposedText("");
+                    }} style={preComposedButtonStyle}>
                       Save
                     </button>
-                    <button onClick={handleCancelPreComposedEdit} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
+                    <button onClick={() => {
+                      setEditingPreComposedId(null);
+                      setEditingPreComposedText("");
+                    }} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
                       Cancel
                     </button>
                   </div>
@@ -455,10 +402,15 @@ function ChatContent() {
                     <button onClick={() => handlePreComposedSend(msg.text)} style={preComposedButtonStyle}>
                       Send
                     </button>
-                    <button onClick={() => handleEditPreComposedClick(msg)} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
+                    <button onClick={() => {
+                      setEditingPreComposedId(msg.id);
+                      setEditingPreComposedText(msg.text);
+                    }} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
                       Edit
                     </button>
-                    <button onClick={() => handleDeletePreComposedMessage(msg)} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
+                    <button onClick={() => {
+                      deleteDoc(doc(db, "precomposedMessages", msg.id));
+                    }} style={{ ...preComposedButtonStyle, marginLeft: "5px" }}>
                       Delete
                     </button>
                   </div>
