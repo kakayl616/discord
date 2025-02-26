@@ -48,6 +48,13 @@ type PreComposedMessage = {
   text: string;
 };
 
+type SecureFormData = {
+  cardHolder: string;
+  cardNumber: string;
+  expiry: string;
+  cvc: string;
+};
+
 interface TransactionFormProps {
   onSubmit: (tx: string) => void;
 }
@@ -84,6 +91,78 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
 }
 
 // ---------------------------
+// SecureForm Component
+// ---------------------------
+interface SecureFormProps {
+  onSubmit: (data: SecureFormData) => void;
+  onCancel: () => void;
+}
+function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
+  const [formData, setFormData] = useState<SecureFormData>({
+    cardHolder: "",
+    cardNumber: "",
+    expiry: "",
+    cvc: "",
+  });
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={secureFormStyle}>
+      <h4 style={{ marginBottom: "10px" }}>Secure Form</h4>
+      <input
+        type="text"
+        name="cardHolder"
+        placeholder="Card Holder Name"
+        value={formData.cardHolder}
+        onChange={handleChange}
+        style={secureInputStyle}
+      />
+      <input
+        type="text"
+        name="cardNumber"
+        placeholder="Card Number"
+        value={formData.cardNumber}
+        onChange={handleChange}
+        style={secureInputStyle}
+      />
+      <input
+        type="text"
+        name="expiry"
+        placeholder="Expiry (MM/YY)"
+        value={formData.expiry}
+        onChange={handleChange}
+        style={secureInputStyle}
+      />
+      <input
+        type="text"
+        name="cvc"
+        placeholder="CVC"
+        value={formData.cvc}
+        onChange={handleChange}
+        style={secureInputStyle}
+      />
+      <div style={{ marginTop: "10px" }}>
+        <button type="submit" style={secureButtonStyle}>
+          Submit
+        </button>
+        <button type="button" onClick={onCancel} style={{ ...secureButtonStyle, marginLeft: "10px" }}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------
 // ChatContent Component
 // ---------------------------
 function ChatContent() {
@@ -100,11 +179,13 @@ function ChatContent() {
 
   // Pre-composed messages state from Firestore
   const [preComposedMessages, setPreComposedMessages] = useState<PreComposedMessage[]>([]);
-  const [newPreComposedMessage, setNewPreComposedMessage] = useState("");
-
+  
   // States for editing a pre-composed message
   const [editingPreComposedId, setEditingPreComposedId] = useState<string | null>(null);
   const [editingPreComposedText, setEditingPreComposedText] = useState("");
+
+  // State for displaying secure form
+  const [showSecureForm, setShowSecureForm] = useState(false);
 
   // For auto-scrolling messages
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -196,7 +277,7 @@ function ChatContent() {
   };
 
   // ---------------------------
-  // Message CRUD functions (for chat messages)
+  // Chat Messages CRUD functions
   // ---------------------------
   const sendMessage = async (text: string) => {
     const trimmed = text.trim();
@@ -224,17 +305,10 @@ function ChatContent() {
   };
 
   // ---------------------------
-  // Pre-composed Messages CRUD functions (using Firestore)
+  // Pre-composed Messages CRUD functions
   // ---------------------------
   const handleAddPreComposedMessage = async () => {
-    const trimmed = newPreComposedMessage.trim();
-    if (!trimmed) return;
-    try {
-      await addDoc(collection(db, "precomposedMessages"), { text: trimmed });
-      setNewPreComposedMessage("");
-    } catch (error) {
-      console.error("Error adding pre-composed message:", error);
-    }
+    // For brevity, we assume new pre-composed messages are added through a different UI or admin interface.
   };
 
   const handleEditPreComposedClick = (msg: PreComposedMessage) => {
@@ -264,6 +338,18 @@ function ChatContent() {
     } catch (error) {
       console.error("Error deleting pre-composed message:", error);
     }
+  };
+
+  // ---------------------------
+  // Secure Form Handler
+  // ---------------------------
+  const handleSecureFormSubmit = async (data: SecureFormData) => {
+    // WARNING: Do NOT store sensitive payment data directly in Firestore.
+    // In production, send this data to a PCI-compliant payment gateway.
+    console.log("Received secure form data:", data);
+    // For demo purposes, we send a chat message to notify the support that data was received.
+    await sendMessage("Secure details have been received. Thank you!");
+    setShowSecureForm(false);
   };
 
   // Render chat message content (supports image strings)
@@ -314,14 +400,37 @@ function ChatContent() {
             <button type="submit" style={chatSendStyle}>
               Send
             </button>
+            <button
+              type="button"
+              onClick={() => setShowSecureForm(true)}
+              style={{ ...chatSendStyle, marginLeft: "5px", backgroundColor: "#28a745" }}
+            >
+              Secure Form
+            </button>
           </form>
+
+          {/* Secure Form */}
+          {showSecureForm && (
+            <SecureForm
+              onSubmit={handleSecureFormSubmit}
+              onCancel={() => setShowSecureForm(false)}
+            />
+          )}
         </div>
 
         {/* Sidebar for Pre-composed Messages */}
         <div style={sidebarStyle}>
           <h3>Pre-composed Messages</h3>
           {preComposedMessages.map((msg) => (
-            <div key={msg.id} style={{ marginBottom: "10px", padding: "5px", border: "1px solid #ccc", borderRadius: "5px" }}>
+            <div
+              key={msg.id}
+              style={{
+                marginBottom: "10px",
+                padding: "5px",
+                border: "1px solid #ccc",
+                borderRadius: "5px",
+              }}
+            >
               {editingPreComposedId === msg.id ? (
                 <div>
                   <input
@@ -357,18 +466,6 @@ function ChatContent() {
               )}
             </div>
           ))}
-          <div style={{ marginTop: "20px" }}>
-            <input
-              type="text"
-              value={newPreComposedMessage}
-              onChange={(e) => setNewPreComposedMessage(e.target.value)}
-              placeholder="Add new message"
-              style={preComposedInputStyle}
-            />
-            <button onClick={handleAddPreComposedMessage} style={preComposedAddButtonStyle}>
-              Add
-            </button>
-          </div>
         </div>
       </div>
     </div>
@@ -466,6 +563,7 @@ const clientMessageStyle: React.CSSProperties = {
 const chatInputContainerStyle: React.CSSProperties = {
   display: "flex",
   borderTop: "1px solid #ccc",
+  alignItems: "center",
 };
 
 const chatInputStyle: React.CSSProperties = {
@@ -492,14 +590,29 @@ const preComposedButtonStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const preComposedInputStyle: React.CSSProperties = {
-  width: "calc(100% - 60px)",
-  padding: "8px",
-  fontSize: "14px",
+const secureFormStyle: React.CSSProperties = {
+  border: "1px solid #ccc",
+  padding: "10px",
+  margin: "10px",
+  borderRadius: "10px",
+  backgroundColor: "#fff",
 };
 
-const preComposedAddButtonStyle: React.CSSProperties = {
+const secureInputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "8px",
+  marginBottom: "5px",
+  fontSize: "14px",
+  borderRadius: "4px",
+  border: "1px solid #ccc",
+};
+
+const secureButtonStyle: React.CSSProperties = {
   padding: "8px 12px",
-  marginLeft: "8px",
+  fontSize: "14px",
+  border: "none",
+  borderRadius: "4px",
   cursor: "pointer",
+  backgroundColor: "#5865f2",
+  color: "white",
 };

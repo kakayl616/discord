@@ -5,7 +5,7 @@
         "has": [
           {
             "type": "host",
-            "value": "www.discordchat.online"
+            "value": "discordchat.online"
           }
         ],
         "destination": "/404",
