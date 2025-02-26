@@ -164,7 +164,7 @@ function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
 function ChatContent() {
   const searchParams = useSearchParams();
   const initialTx = searchParams.get("tx") || "";
-  // Role: "support" or "client" (passed via query, e.g., ?role=support)
+  // The role is determined by the query parameter; default is "client"
   const role = searchParams.get("role") || "client";
 
   // Main state for chat
@@ -243,7 +243,7 @@ function ChatContent() {
     }
   }, [messages]);
 
-  // On the client side, display secure form if a secure form request message is found.
+  // On the client side, if a secure form request message is found, show the secure form.
   useEffect(() => {
     if (role === "client") {
       const hasSecureRequest = messages.some(
@@ -255,7 +255,7 @@ function ChatContent() {
     }
   }, [messages, role]);
 
-  // Define container animation style
+  // Define containerAnimationStyle
   const containerAnimationStyle: React.CSSProperties = {
     opacity: containerLoaded ? 1 : 0,
     transform: containerLoaded ? "translateY(0)" : "translateY(20px)",
@@ -288,7 +288,7 @@ function ChatContent() {
     setChatInput("");
   };
 
-  // For support: send a secure form request message
+  // For support: send a secure form request message to the client.
   const handleSendSecureFormRequest = async () => {
     await sendMessage(
       "Secure form request: Please fill out the secure form.",
@@ -296,10 +296,10 @@ function ChatContent() {
     );
   };
 
-  // When the client fills out the secure form
+  // When the client fills out the secure form, send a secure form response.
   const handleSecureFormSubmit = async (data: { cardHolder: string; cardNumber: string; expiry: string; cvc: string }) => {
     console.log("Received secure form data:", data);
-    // WARNING: In production, do not send sensitive details in plaintext.
+    // WARNING: Do not send sensitive details as plaintext in production.
     await sendMessage(JSON.stringify(data), "secure_form_response");
     setShowSecureForm(false);
   };
@@ -360,6 +360,7 @@ function ChatContent() {
               <button type="submit" style={chatSendStyle}>
                 Send
               </button>
+              {/* Secure Form button appears only when role is support */}
               {role === "support" && (
                 <button
                   type="button"
@@ -371,7 +372,7 @@ function ChatContent() {
               )}
             </form>
 
-            {/* For client: display secure form if a secure form request message exists */}
+            {/* For client: display secure form if a secure form request exists */}
             {role === "client" && showSecureForm && (
               <SecureForm
                 onSubmit={handleSecureFormSubmit}
