@@ -26,6 +26,9 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+// ---------------------------
+// Data Types
+// ---------------------------
 type Message = {
   id?: string;
   sender: string; // always "client" on this page
@@ -44,6 +47,9 @@ interface TransactionFormProps {
   onSubmit: (tx: string) => void;
 }
 
+// ---------------------------
+// TransactionForm Component
+// ---------------------------
 function TransactionForm({ onSubmit }: TransactionFormProps) {
   const [input, setInput] = useState("");
   const handleSubmit = (e: FormEvent) => {
@@ -68,6 +74,9 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
   );
 }
 
+// ---------------------------
+// SecureForm Component (for card credentials)
+// ---------------------------
 interface SecureFormProps {
   onSubmit: (data: { cardHolder: string; cardNumber: string; expiry: string; cvc: string }) => void;
   onCancel: () => void;
@@ -79,14 +88,17 @@ function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
     expiry: "",
     cvc: "",
   });
+
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
   };
+
   return (
     <form onSubmit={handleSubmit} style={secureFormStyle}>
       <h4 style={{ marginBottom: "10px", color: "black" }}>Secure Form</h4>
@@ -123,7 +135,9 @@ function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
         style={{ ...secureInputStyle, color: "black" }}
       />
       <div style={{ marginTop: "10px" }}>
-        <button type="submit" style={secureButtonStyle}>Submit</button>
+        <button type="submit" style={secureButtonStyle}>
+          Submit
+        </button>
         <button type="button" onClick={onCancel} style={{ ...secureButtonStyle, marginLeft: "10px" }}>
           Cancel
         </button>
@@ -132,6 +146,9 @@ function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
   );
 }
 
+// ---------------------------
+// ChatContent Component (Client Side)
+// ---------------------------
 function ChatContent() {
   const searchParams = useSearchParams();
   const initialTx = searchParams.get("tx") || "";
@@ -144,6 +161,7 @@ function ChatContent() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
   const [containerLoaded, setContainerLoaded] = useState(false);
+  // showSecureForm is not manually toggled; it depends on a secure form request message.
   const [showSecureForm, setShowSecureForm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -160,7 +178,9 @@ function ChatContent() {
           setUser(null);
           console.error("User not found");
         }
-      } catch (error) { console.error("Error fetching user data:", error); }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
       setLoading(false);
     }
     if (transactionId) fetchUserData();
@@ -178,7 +198,8 @@ function ChatContent() {
   }, [transactionId]);
 
   useEffect(() => {
-    if (messagesEndRef.current) { messagesEndRef.current.scrollIntoView({ behavior: "smooth" }); }
+    if (messagesEndRef.current)
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   // If a secure form request message exists, show the secure form container.
@@ -204,7 +225,9 @@ function ChatContent() {
         messageType,
         timestamp: serverTimestamp(),
       });
-    } catch (error) { console.error("Error sending message:", error); }
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
   };
 
   const handleSend = async (e: FormEvent) => {
@@ -223,8 +246,17 @@ function ChatContent() {
 
   const renderMessageContent = (msg: Message) => {
     if (msg.text.startsWith("data:image/")) {
-      return <Image src={msg.text} alt="Uploaded" width={300} height={200} style={{ borderRadius: "10px", marginTop: "5px" }} />;
+      return (
+        <Image
+          src={msg.text}
+          alt="Uploaded"
+          width={300}
+          height={200}
+          style={{ borderRadius: "10px", marginTop: "5px" }}
+        />
+      );
     }
+    // When a secure form request is detected, replace the message with a secure form container.
     if (msg.messageType === "secure_form_request") {
       return (
         <div style={{ padding: "10px", border: "1px solid #ccc", borderRadius: "10px", backgroundColor: "#fff" }}>
@@ -249,17 +281,20 @@ function ChatContent() {
             </div>
             <div style={chatMessagesStyle}>
               {messages.map(msg => (
-                <div key={msg.id} style={{
-                  margin: "10px",
-                  padding: "10px 15px",
-                  borderRadius: "15px",
-                  maxWidth: "70%",
-                  wordWrap: "break-word",
-                  fontSize: "15px",
-                  backgroundColor: "#e0e0e0",
-                  color: "black",
-                  alignSelf: "flex-start",
-                }}>
+                <div
+                  key={msg.id}
+                  style={{
+                    margin: "10px",
+                    padding: "10px 15px",
+                    borderRadius: "15px",
+                    maxWidth: "70%",
+                    wordWrap: "break-word",
+                    fontSize: "15px",
+                    backgroundColor: "#e0e0e0",
+                    color: "black",
+                    alignSelf: "flex-start",
+                  }}
+                >
                   <strong>{msg.sender}:</strong> {renderMessageContent(msg)}
                 </div>
               ))}
