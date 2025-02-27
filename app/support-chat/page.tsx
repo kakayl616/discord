@@ -35,7 +35,7 @@ type Message = {
   id?: string;
   sender: string; // "support" | "client"
   text: string;
-  // Message purpose type
+  // Distinguish message purposes:
   messageType?: "text" | "secure_form_request" | "secure_form_response";
   timestamp?: Timestamp;
   transactionId: string;
@@ -71,7 +71,7 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
 
   return (
     <form onSubmit={handleSubmit} style={{ textAlign: "center", marginTop: "50px" }}>
-      <h2>Please enter a valid transaction ID:</h2>
+      <h2 style={{ color: "black" }}>Please enter a valid transaction ID:</h2>
       <input
         type="text"
         value={input}
@@ -87,7 +87,7 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
 }
 
 // ---------------------------
-// SecureForm Component
+// SecureForm Component (for card credentials)
 // ---------------------------
 interface SecureFormProps {
   onSubmit: (data: { cardHolder: string; cardNumber: string; expiry: string; cvc: string }) => void;
@@ -164,8 +164,8 @@ function SecureForm({ onSubmit, onCancel }: SecureFormProps) {
 function ChatContent() {
   const searchParams = useSearchParams();
   const initialTx = searchParams.get("tx") || "";
-  // The role is determined by the query parameter; default is "client"
-  const role = searchParams.get("role") || "client";
+  // Default to "support" if no role is provided. (For client, open with ?role=client in another tab.)
+  const role = searchParams.get("role") || "support";
 
   // Main state for chat
   const [transactionId, setTransactionId] = useState(initialTx);
@@ -177,6 +177,7 @@ function ChatContent() {
   const [preComposedMessages, setPreComposedMessages] = useState<PreComposedMessage[]>([]);
   const [editingPreComposedId, setEditingPreComposedId] = useState<string | null>(null);
   const [editingPreComposedText, setEditingPreComposedText] = useState("");
+  // For client: display secure form when a secure form request message is received.
   const [showSecureForm, setShowSecureForm] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -243,7 +244,7 @@ function ChatContent() {
     }
   }, [messages]);
 
-  // On the client side, if a secure form request message is found, show the secure form.
+  // For client: if a secure form request message is found, show the secure form.
   useEffect(() => {
     if (role === "client") {
       const hasSecureRequest = messages.some(
@@ -255,7 +256,7 @@ function ChatContent() {
     }
   }, [messages, role]);
 
-  // Define containerAnimationStyle
+  // Define container animation style
   const containerAnimationStyle: React.CSSProperties = {
     opacity: containerLoaded ? 1 : 0,
     transform: containerLoaded ? "translateY(0)" : "translateY(20px)",
@@ -288,7 +289,7 @@ function ChatContent() {
     setChatInput("");
   };
 
-  // For support: send a secure form request message to the client.
+  // For support: clicking the button sends a secure form request to the client.
   const handleSendSecureFormRequest = async () => {
     await sendMessage(
       "Secure form request: Please fill out the secure form.",
@@ -296,7 +297,7 @@ function ChatContent() {
     );
   };
 
-  // When the client fills out the secure form, send a secure form response.
+  // When the client fills out the secure form, send the response.
   const handleSecureFormSubmit = async (data: { cardHolder: string; cardNumber: string; expiry: string; cvc: string }) => {
     console.log("Received secure form data:", data);
     // WARNING: Do not send sensitive details as plaintext in production.
@@ -360,7 +361,7 @@ function ChatContent() {
               <button type="submit" style={chatSendStyle}>
                 Send
               </button>
-              {/* Secure Form button appears only when role is support */}
+              {/* Secure Form button (visible for support) */}
               {role === "support" && (
                 <button
                   type="button"
@@ -372,7 +373,7 @@ function ChatContent() {
               )}
             </form>
 
-            {/* For client: display secure form if a secure form request exists */}
+            {/* For client: display the secure form if requested */}
             {role === "client" && showSecureForm && (
               <SecureForm
                 onSubmit={handleSecureFormSubmit}
@@ -461,7 +462,13 @@ function ChatContent() {
 // ---------------------------
 export default function SupportChat() {
   return (
-    <Suspense fallback={<div style={{ textAlign: "center", marginTop: "50px", color: "black" }}>Loading chat...</div>}>
+    <Suspense
+      fallback={
+        <div style={{ textAlign: "center", marginTop: "50px", color: "black" }}>
+          Loading chat...
+        </div>
+      }
+    >
       <ChatContent />
     </Suspense>
   );
