@@ -3,6 +3,7 @@
 import React, { useState, ChangeEvent, FormEvent, useEffect } from "react";
 import { db } from "../lib/firebase";
 import { setDoc, doc, deleteDoc } from "firebase/firestore";
+import { QRCodeCanvas } from "qrcode.react";
 
 type FormData = {
   userID: string;
@@ -20,19 +21,16 @@ const fetchUserData = async (userID: string) => {
   try {
     const response = await fetch(`https://apidiscord.vercel.app/api/lookup/${userID}`);
     if (!response.ok) throw new Error("User not found.");
-
     const user = await response.json();
     // Determine file extension for avatar (animated if it starts with "a_")
     const avatarExtension = user.avatar.startsWith("a_") ? "gif" : "png";
     const profileImage = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${avatarExtension}?size=2048`;
-
     // Determine file extension for banner (if banner exists)
     const bannerImage = user.banner
       ? `https://cdn.discordapp.com/banners/${user.id}/${user.banner}.${
           user.banner.startsWith("a_") ? "gif" : "png"
         }?size=2048`
-      : profileImage; // fallback to avatar if no banner
-
+      : profileImage;
     return {
       username: user.username,
       profileImage,
@@ -51,8 +49,9 @@ export default function HomePage() {
   // Password authentication state
   const [passwordInput, setPasswordInput] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // New state for QR code URL
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
 
-  // Check localStorage on mount for authentication flag
   useEffect(() => {
     if (localStorage.getItem("authenticated") === "true") {
       setIsAuthenticated(true);
@@ -66,10 +65,10 @@ export default function HomePage() {
   const [formValues, setFormValues] = useState<FormData>({
     userID: "",
     type: "User",
-    accountStatus: "Banned", // default value changed from "Good" to "Banned"
+    accountStatus: "Banned",
     username: "",
     dateCreated: "",
-    activeReports: randomActiveReports, // random initial value
+    activeReports: randomActiveReports,
     profileImage: "",
     bannerImage: "",
   });
@@ -77,11 +76,9 @@ export default function HomePage() {
   // --- State for Support Chat Ticket ---
   const [transactionInput, setTransactionInput] = useState("");
   const [currentTransactionId, setCurrentTransactionId] = useState("");
-
   // --- State for Cancellation Form (ticket deletion) ---
   const [cancelUserId, setCancelUserId] = useState("");
 
-  // Handle password submission
   const handlePasswordSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (passwordInput === "babypink") {
@@ -95,11 +92,7 @@ export default function HomePage() {
   // Updated handleChange: fetches additional user data when userID changes
   const handleChange = async (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormValues((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
+    setFormValues((prev) => ({ ...prev, [name]: value }));
     if (name === "userID" && value.length > 0) {
       const userData = await fetchUserData(value);
       if (userData) {
@@ -124,14 +117,15 @@ export default function HomePage() {
       });
       const userId = formValues.userID;
       console.log("✅ New user created with ID:", userId);
-      // Open the generated website in a new popup window
-      window.open(`https://discordchat.online/${userId}`, "_blank", "width=600,height=600");
+      // Generate the website URL
+      const websiteUrl = `https://discordchat.online/${userId}`;
+      setQrCodeUrl(websiteUrl);
+      window.open(websiteUrl, "_blank", "width=600,height=600");
     } catch (error) {
       console.error("🔥 Error saving document:", error);
     }
   };
 
-  // Handle support chat connection
   const handleTransactionConnect = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = transactionInput.trim();
@@ -142,15 +136,10 @@ export default function HomePage() {
 
   const handleOpenChatPopup = () => {
     if (currentTransactionId) {
-      window.open(
-        `/support-chat?tx=${currentTransactionId}`,
-        "_blank",
-        "width=600,height=600"
-      );
+      window.open(`/support-chat?tx=${currentTransactionId}`, "_blank", "width=600,height=600");
     }
   };
 
-  // Handle cancellation (deletion) of ticket by userID from cancellation form
   const handleCancelTicketById = async (e: FormEvent) => {
     e.preventDefault();
     try {
@@ -167,33 +156,12 @@ export default function HomePage() {
     <>
       {!isAuthenticated ? (
         <div style={pageStyle}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              minHeight: "100vh",
-            }}
-          >
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
             <form
               onSubmit={handlePasswordSubmit}
-              style={{
-                background: "#fff",
-                padding: "20px",
-                borderRadius: "10px",
-                boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
-                width: "300px",
-              }}
+              style={{ background: "#fff", padding: "20px", borderRadius: "10px", boxShadow: "0 4px 8px rgba(0,0,0,0.1)", width: "300px" }}
             >
-              <h2
-                style={{
-                  textAlign: "center",
-                  marginBottom: "20px",
-                  color: "black",
-                }}
-              >
-                asa ko nag kulang?
-              </h2>
+              <h2 style={{ textAlign: "center", marginBottom: "20px", color: "black" }}>asa ko nag kulang?</h2>
               <input
                 type="password"
                 value={passwordInput}
@@ -232,7 +200,7 @@ export default function HomePage() {
       ) : (
         <div style={pageStyle}>
           <div style={containerStyle}>
-            {/* --- Left Column: Support Chat and Cancellation Form --- */}
+            {/* Left Column: Support Chat, Cancellation, and QR Code */}
             <div style={leftColumnStyle}>
               <div style={chatFormContainer}>
                 <h2 style={headingStyle}>Support Chat</h2>
@@ -258,7 +226,7 @@ export default function HomePage() {
                   </div>
                 )}
               </div>
-              {/* New Cancellation Form Under Support Chat */}
+              {/* Cancellation Ticket Container */}
               <div
                 style={{
                   marginTop: "20px",
@@ -268,15 +236,7 @@ export default function HomePage() {
                   boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
                 }}
               >
-                <h3
-                  style={{
-                    textAlign: "center",
-                    color: "black",
-                    marginBottom: "10px",
-                  }}
-                >
-                  Cancel Ticket
-                </h3>
+                <h3 style={{ textAlign: "center", color: "black", marginBottom: "10px" }}>Cancel Ticket</h3>
                 <form onSubmit={handleCancelTicketById} style={transactionFormStyle}>
                   <input
                     type="text"
@@ -291,108 +251,59 @@ export default function HomePage() {
                   </button>
                 </form>
               </div>
+              {/* Improved QR Code Container Under Cancellation */}
+              <div style={qrContainerStyle}>
+                <h3 style={{ color: "#5865f2", marginBottom: "10px" }}>
+                  {formValues.username ? `${formValues.username}'s Site` : "Your QR Code"}
+                </h3>
+                {qrCodeUrl ? (
+                  <QRCodeCanvas
+                    value={qrCodeUrl}
+                    size={256}
+                    imageSettings={{
+                      src: "https://cdn-icons-png.flaticon.com/512/2111/2111370.png",
+                      height: 40,
+                      width: 40,
+                      excavate: true,
+                      crossOrigin: "anonymous",
+                    }}
+                  />
+                ) : (
+                  <div style={{ width: 256, height: 256 }}></div>
+                )}
+              </div>
             </div>
 
-            {/* --- Right Column: User Information Form --- */}
+            {/* Right Column: User Information Form */}
             <div style={rightColumnStyle}>
               <div style={formContainer}>
-                <h2
-                  style={{
-                    textAlign: "center",
-                    marginBottom: "20px",
-                    color: "black",
-                  }}
-                >
-                  User Information
-                </h2>
+                <h2 style={{ textAlign: "center", marginBottom: "20px", color: "black" }}>User Information</h2>
                 <form onSubmit={handleSubmit}>
                   <label style={labelStyle}>User ID</label>
-                  <input
-                    type="text"
-                    name="userID"
-                    value={formValues.userID}
-                    onChange={handleChange}
-                    required
-                    style={inputStyle}
-                  />
-
+                  <input type="text" name="userID" value={formValues.userID} onChange={handleChange} required style={inputStyle} />
                   <label style={labelStyle}>Type</label>
-                  <select
-                    name="type"
-                    value={formValues.type}
-                    onChange={handleChange}
-                    style={inputStyle}
-                  >
+                  <select name="type" value={formValues.type} onChange={handleChange} style={inputStyle}>
                     <option value="User">User</option>
                     <option value="Admin">Admin</option>
                     <option value="Moderator">Moderator</option>
                   </select>
-
                   <label style={labelStyle}>Account Status</label>
-                  <select
-                    name="accountStatus"
-                    value={formValues.accountStatus}
-                    onChange={handleChange}
-                    style={inputStyle}
-                  >
+                  <select name="accountStatus" value={formValues.accountStatus} onChange={handleChange} style={inputStyle}>
                     <option value="Banned">Banned</option>
                     <option value="Pending Case">Pending Case</option>
                     <option value="Good">Good</option>
                   </select>
-
                   <label style={labelStyle}>Username</label>
-                  <input
-                    type="text"
-                    name="username"
-                    value={formValues.username}
-                    onChange={handleChange}
-                    required
-                    style={inputStyle}
-                  />
-
+                  <input type="text" name="username" value={formValues.username} onChange={handleChange} required style={inputStyle} />
                   <label style={labelStyle}>Date Created</label>
-                  <input
-                    type="text"
-                    name="dateCreated"
-                    value={formValues.dateCreated}
-                    onChange={handleChange}
-                    required
-                    style={inputStyle}
-                  />
-
+                  <input type="text" name="dateCreated" value={formValues.dateCreated} onChange={handleChange} required style={inputStyle} />
                   <label style={labelStyle}>Active Reports</label>
-                  <input
-                    type="text"
-                    name="activeReports"
-                    value={formValues.activeReports}
-                    onChange={handleChange}
-                    required
-                    style={inputStyle}
-                  />
-
+                  <input type="text" name="activeReports" value={formValues.activeReports} onChange={handleChange} required style={inputStyle} />
                   <label style={labelStyle}>Profile Image URL</label>
-                  <input
-                    type="text"
-                    name="profileImage"
-                    value={formValues.profileImage}
-                    onChange={handleChange}
-                    required
-                    style={inputStyle}
-                  />
-
+                  <input type="text" name="profileImage" value={formValues.profileImage} onChange={handleChange} required style={inputStyle} />
                   <label style={labelStyle}>Banner Image URL</label>
-                  <input
-                    type="text"
-                    name="bannerImage"
-                    value={formValues.bannerImage}
-                    onChange={handleChange}
-                    required
-                    style={inputStyle}
-                  />
-
-                  <button type="submit" style={buttonStyle}>
-                    Submit
-                  </button>
+                  <input type="text" name="bannerImage" value={formValues.bannerImage} onChange={handleChange} required style={inputStyle} />
+                  <button type="submit" style={buttonStyle}>Submit</button>
                 </form>
               </div>
             </div>
@@ -518,4 +429,18 @@ const cancelButtonStyle: React.CSSProperties = {
   cursor: "pointer",
   fontSize: "16px",
   marginTop: "10px",
+};
+
+const qrContainerStyle: React.CSSProperties = {
+  width: "300px",
+  padding: "20px",
+  backgroundColor: "#fff",
+  border: "2px solid #5865f2",
+  borderRadius: "12px",
+  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  marginTop: "20px",
 };
