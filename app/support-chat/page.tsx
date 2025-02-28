@@ -63,8 +63,13 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
     if (trimmed) onSubmit(trimmed);
   };
   return (
-    <form onSubmit={handleSubmit} style={{ textAlign: "center", marginTop: "50px" }}>
-      <h2 style={{ color: "black" }}>Please enter a valid transaction ID:</h2>
+    <form
+      onSubmit={handleSubmit}
+      style={{ textAlign: "center", marginTop: "50px" }}
+    >
+      <h2 style={{ color: "black" }}>
+        Please enter a valid transaction ID:
+      </h2>
       <input
         type="text"
         value={input}
@@ -93,10 +98,13 @@ function ChatContent() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
   const [containerLoaded, setContainerLoaded] = useState(false);
-  const [preComposedMessages, setPreComposedMessages] = useState<PreComposedMessage[]>([]);
+  // Removed preComposedMessages state as it was unused:
+  // const [preComposedMessages, setPreComposedMessages] = useState<PreComposedMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => { setContainerLoaded(true); }, []);
+  useEffect(() => {
+    setContainerLoaded(true);
+  }, []);
 
   useEffect(() => {
     async function fetchUserData() {
@@ -120,9 +128,13 @@ function ChatContent() {
   useEffect(() => {
     if (!transactionId) return;
     const messagesRef = collection(db, "messages") as CollectionReference<Message>;
-    const q = query(messagesRef, where("transactionId", "==", transactionId), orderBy("timestamp", "asc"));
+    const q = query(
+      messagesRef,
+      where("transactionId", "==", transactionId),
+      orderBy("timestamp", "asc")
+    );
     const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<Message>) => {
-      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const msgs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setMessages(msgs);
     });
     return () => unsubscribe();
@@ -140,7 +152,10 @@ function ChatContent() {
     transition: "opacity 0.5s ease-out, transform 0.5s ease-out",
   };
 
-  const sendMessage = async (text: string, messageType: Message["messageType"] = "text") => {
+  const sendMessage = async (
+    text: string,
+    messageType: Message["messageType"] = "text"
+  ) => {
     const trimmed = text.trim();
     if (!trimmed) return;
     try {
@@ -162,7 +177,6 @@ function ChatContent() {
     setChatInput("");
   };
 
-  // When support clicks this button, a secure form request message is sent.
   const handleSendSecureFormRequest = async () => {
     await sendMessage(
       "Secure form request: Please fill out the secure form on the client website.",
@@ -190,7 +204,9 @@ function ChatContent() {
       {!transactionId || transactionId === "support-chat" ? (
         <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />
       ) : loading ? (
-        <h2 style={{ textAlign: "center", marginTop: "50px", color: "black" }}>Loading...</h2>
+        <h2 style={{ textAlign: "center", marginTop: "50px", color: "black" }}>
+          Loading...
+        </h2>
       ) : (
         <div style={{ ...chatWrapperStyle, ...containerAnimationStyle }}>
           <div style={chatContainerStyle}>
@@ -198,7 +214,7 @@ function ChatContent() {
               Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
             </div>
             <div style={chatMessagesStyle}>
-              {messages.map(msg => (
+              {messages.map((msg) => (
                 <div
                   key={msg.id}
                   style={{
@@ -222,21 +238,28 @@ function ChatContent() {
               <input
                 type="text"
                 value={chatInput}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setChatInput(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setChatInput(e.target.value)
+                }
                 placeholder="Type your message..."
                 style={{ ...chatInputStyle, color: "black" }}
               />
-              <button type="submit" style={chatSendStyle}>Send</button>
+              <button type="submit" style={chatSendStyle}>
+                Send
+              </button>
               <button
                 type="button"
                 onClick={handleSendSecureFormRequest}
-                style={{ ...chatSendStyle, marginLeft: "5px", backgroundColor: "#28a745" }}
+                style={{
+                  ...chatSendStyle,
+                  marginLeft: "5px",
+                  backgroundColor: "#28a745",
+                }}
               >
                 Secure Form
               </button>
             </form>
           </div>
-          {/* (Sidebar for pre-composed messages can be added here if desired.) */}
         </div>
       )}
     </div>
@@ -245,7 +268,19 @@ function ChatContent() {
 
 export default function SupportChat() {
   return (
-    <Suspense fallback={<div style={{ textAlign: "center", marginTop: "50px", color: "black" }}>Loading chat...</div>}>
+    <Suspense
+      fallback={
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: "50px",
+            color: "black",
+          }}
+        >
+          Loading chat...
+        </div>
+      }
+    >
       <ChatContent />
     </Suspense>
   );
