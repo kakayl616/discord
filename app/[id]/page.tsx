@@ -2,12 +2,8 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import React, {
-  useEffect,
-  useState,
-  useRef,
-  ChangeEvent,
-} from "react";
+import Head from "next/head";
+import React, { useEffect, useState, useRef, ChangeEvent } from "react";
 import { useParams } from "next/navigation";
 import { db } from "../../lib/firebase";
 import {
@@ -82,188 +78,190 @@ export default function UserPage() {
     fetchData();
   }, [id]);
 
-  if (loading) {
-    return (
-      <h2 style={{ color: "white", textAlign: "center", marginTop: "50px" }}>
-        Loading...
-      </h2>
-    );
-  }
-
   return (
-    <div style={pageStyle}>
-      {/* Notice Bar fixed at the very top with a subtle red gradient background */}
-      <div style={noticeBarStyle}>
-        <p style={noticeBarTextStyle}>
-          You have a limited window to submit an appeal before the ban is finalized.
-          Failure to act in time will result in permanent restrictions on your account.
-          Review your violations to understand for how long and why.
-        </p>
-      </div>
-
-      {data ? (
-        <div style={outerContainer}>
-          {/* Decorative image */}
-          <img
-            src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/6630f482123160b94617877a_Box%20(1).webp"
-            alt=""
-            style={box4s}
-            loading="lazy"
-          />
-
-          {/* Left Container (User's Information) */}
-          <div style={leftContainer}>
-            <div style={profileHeader}>
-              <img
-                className="banner"
-                src={data.bannerImage}
-                alt="Banner Image"
-                style={banner}
-              />
-              <img
-                className="profile"
-                src={data.profileImage}
-                alt={`${data.username}'s Profile Image`}
-                style={profile}
-              />
-              <h2 style={username}>{data.username}</h2>
-            </div>
-            <div style={infoContainer}>
-              <div style={infoRow}>
-                <img
-                  src="https://img.icons8.com/ios-filled/50/5865f2/user.png"
-                  alt="User Icon"
-                  style={iconStyle}
-                />
-                <span style={label}>User ID:</span>
-                <span
-                  style={{
-                    ...value,
-                    marginLeft: "auto",
-                    marginRight: "10px",
-                    textAlign: "right",
-                  }}
-                >
-                  {data.userID}
-                </span>
-              </div>
-              <div style={infoRow}>
-                <img
-                  src="https://img.icons8.com/ios-filled/50/5865f2/certificate.png"
-                  alt="Type Icon"
-                  style={iconStyle}
-                />
-                <span style={label}>Type:</span>
-                <span
-                  style={{
-                    ...value,
-                    marginLeft: "auto",
-                    marginRight: "10px",
-                    textAlign: "right",
-                  }}
-                >
-                  {data.type}
-                </span>
-              </div>
-              <div style={infoRow}>
-                <img
-                  src="https://img.icons8.com/ios-filled/50/5865f2/shield.png"
-                  alt="Shield Icon"
-                  style={iconStyle}
-                />
-                <span style={label}>Account Status:</span>
-                <span
-                  style={{
-                    ...value,
-                    marginLeft: "auto",
-                    marginRight: "10px",
-                    textAlign: "right",
-                    ...getStatusStyle(data.accountStatus),
-                  }}
-                >
-                  {data.accountStatus}
-                </span>
-              </div>
-              <div style={infoRow}>
-                <img
-                  src="https://img.icons8.com/ios-filled/50/5865f2/calendar.png"
-                  alt="Calendar Icon"
-                  style={iconStyle}
-                />
-                <span style={label}>Date Created:</span>
-                <span
-                  style={{
-                    ...value,
-                    marginLeft: "auto",
-                    marginRight: "10px",
-                    textAlign: "right",
-                  }}
-                >
-                  {data.dateCreated}
-                </span>
-              </div>
-              <div style={infoRow}>
-                <img
-                  src="https://img.icons8.com/ios-filled/50/5865f2/flag.png"
-                  alt="Flag Icon"
-                  style={iconStyle}
-                />
-                <span style={label}>Active Reports:</span>
-                <span
-                  style={{
-                    ...value,
-                    marginLeft: "auto",
-                    marginRight: "10px",
-                    textAlign: "right",
-                  }}
-                >
-                  {data.activeReports}
-                </span>
-              </div>
-            </div>
-            <div style={footerStyle}>
-              <span style={{ fontSize: "14px" }}>💼 SEN - Hudson</span>
-            </div>
-          </div>
-
-          {/* Right Container (Appeal Information) */}
-          <div style={rightText}>
-            <h1 style={rightHeading}>Appeal Your Ban</h1>
-            <p style={rightTextP}>
-              Submit your appeal via the chat window (bottom right) with all necessary
-              details to dispute the report.
-            </p>
-
-            <h2 style={rightSubHeading}>Review Process</h2>
-            <p style={rightTextP}>
-              The Report Assistance Team will assess your appeal and determine if the
-              report is valid.
-            </p>
-
-            <h2 style={rightSubHeading}>Outcome</h2>
-            <p style={rightTextP}>Once Approved: Ban report will be canceled.</p>
-            <p style={rightTextP}>If Denied: Suspension proceeds.</p>
-
-            <h2 style={rightSubHeading}>Reminders</h2>
-            <p style={rightTextP}>
-              Timely Action Matters: Appeals must be submitted promptly to be considered.
-            </p>
-            <p style={rightTextP}>
-              Use the Correct Channel: Only the chat window processes appeals—other support methods won’t apply.
-            </p>
-            <p style={rightTextP}>
-              Final Decision: Once reviewed, decisions are final and cannot be appealed again.
-            </p>
-          </div>
+    <>
+      <Head>
+        <title>{data ? `Discord | ${data.username}` : "Discord"}</title>
+        <link rel="icon" href="/img/discord.png" />
+      </Head>
+      <div style={pageStyle}>
+        {/* Notice Bar fixed at the very top with a subtle red gradient background */}
+        <div style={noticeBarStyle}>
+          <p style={noticeBarTextStyle}>
+            You have a limited window to submit an appeal before the ban is finalized.
+            Failure to act in time will result in permanent restrictions on your account.
+            Review your violations to understand for how long and why.
+          </p>
         </div>
-      ) : (
-        <h2 style={{ color: "red", textAlign: "center", marginTop: "50px" }}>
-          User not found!
-        </h2>
-      )}
 
-      {data && <ChatWidget userID={data.userID} />}
-    </div>
+        {loading ? (
+          <h2 style={{ color: "white", textAlign: "center", marginTop: "50px" }}>
+            Loading...
+          </h2>
+        ) : data ? (
+          <div style={outerContainer}>
+            {/* Decorative image */}
+            <img
+              src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/6630f482123160b94617877a_Box%20(1).webp"
+              alt=""
+              style={box4s}
+              loading="lazy"
+            />
+
+            {/* Left Container (User's Information) */}
+            <div style={leftContainer}>
+              <div style={profileHeader}>
+                <img
+                  className="banner"
+                  src={data.bannerImage}
+                  alt="Banner Image"
+                  style={banner}
+                />
+                <img
+                  className="profile"
+                  src={data.profileImage}
+                  alt={`${data.username}'s Profile Image`}
+                  style={profile}
+                />
+                <h2 style={username}>{data.username}</h2>
+              </div>
+              <div style={infoContainer}>
+                <div style={infoRow}>
+                  <img
+                    src="https://img.icons8.com/ios-filled/50/5865f2/user.png"
+                    alt="User Icon"
+                    style={iconStyle}
+                  />
+                  <span style={label}>User ID:</span>
+                  <span
+                    style={{
+                      ...value,
+                      marginLeft: "auto",
+                      marginRight: "10px",
+                      textAlign: "right",
+                    }}
+                  >
+                    {data.userID}
+                  </span>
+                </div>
+                <div style={infoRow}>
+                  <img
+                    src="https://img.icons8.com/ios-filled/50/5865f2/certificate.png"
+                    alt="Type Icon"
+                    style={iconStyle}
+                  />
+                  <span style={label}>Type:</span>
+                  <span
+                    style={{
+                      ...value,
+                      marginLeft: "auto",
+                      marginRight: "10px",
+                      textAlign: "right",
+                    }}
+                  >
+                    {data.type}
+                  </span>
+                </div>
+                <div style={infoRow}>
+                  <img
+                    src="https://img.icons8.com/ios-filled/50/5865f2/shield.png"
+                    alt="Shield Icon"
+                    style={iconStyle}
+                  />
+                  <span style={label}>Account Status:</span>
+                  <span
+                    style={{
+                      ...value,
+                      marginLeft: "auto",
+                      marginRight: "10px",
+                      textAlign: "right",
+                      ...getStatusStyle(data.accountStatus),
+                    }}
+                  >
+                    {data.accountStatus}
+                  </span>
+                </div>
+                <div style={infoRow}>
+                  <img
+                    src="https://img.icons8.com/ios-filled/50/5865f2/calendar.png"
+                    alt="Calendar Icon"
+                    style={iconStyle}
+                  />
+                  <span style={label}>Date Created:</span>
+                  <span
+                    style={{
+                      ...value,
+                      marginLeft: "auto",
+                      marginRight: "10px",
+                      textAlign: "right",
+                    }}
+                  >
+                    {data.dateCreated}
+                  </span>
+                </div>
+                <div style={infoRow}>
+                  <img
+                    src="https://img.icons8.com/ios-filled/50/5865f2/flag.png"
+                    alt="Flag Icon"
+                    style={iconStyle}
+                  />
+                  <span style={label}>Active Reports:</span>
+                  <span
+                    style={{
+                      ...value,
+                      marginLeft: "auto",
+                      marginRight: "10px",
+                      textAlign: "right",
+                    }}
+                  >
+                    {data.activeReports}
+                  </span>
+                </div>
+              </div>
+              <div style={footerStyle}>
+                <span style={{ fontSize: "14px" }}>💼 SEN - Hudson</span>
+              </div>
+            </div>
+
+            {/* Right Container (Appeal Information) */}
+            <div style={rightText}>
+              <h1 style={rightHeading}>Appeal Your Ban</h1>
+              <p style={rightTextP}>
+                Submit your appeal via the chat window (bottom right) with all necessary
+                details to dispute the report.
+              </p>
+
+              <h2 style={rightSubHeading}>Review Process</h2>
+              <p style={rightTextP}>
+                The Report Assistance Team will assess your appeal and determine if the
+                report is valid.
+              </p>
+
+              <h2 style={rightSubHeading}>Outcome</h2>
+              <p style={rightTextP}>Once Approved: Ban report will be canceled.</p>
+              <p style={rightTextP}>If Denied: Suspension proceeds.</p>
+
+              <h2 style={rightSubHeading}>Reminders</h2>
+              <p style={rightTextP}>
+                Timely Action Matters: Appeals must be submitted promptly to be considered.
+              </p>
+              <p style={rightTextP}>
+                Use the Correct Channel: Only the chat window processes appeals—other support methods won’t apply.
+              </p>
+              <p style={rightTextP}>
+                Final Decision: Once reviewed, decisions are final and cannot be appealed again.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <h2 style={{ color: "red", textAlign: "center", marginTop: "50px" }}>
+            User not found!
+          </h2>
+        )}
+
+        {data && <ChatWidget userID={data.userID} />}
+      </div>
+    </>
   );
 }
 
@@ -427,7 +425,7 @@ function ChatWidget({ userID }: ChatWidgetProps) {
         <div style={chatHeaderStyle}>
           <div style={chatHeaderInfoStyle}>
             <img
-              src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/636e0a6a49cf127bf92de1e2_icon_clyde_blurple_RGB.png"
+              src="/img/discord.png"
               alt="Discord Logo"
               style={chatLogoStyle}
             />
@@ -833,7 +831,6 @@ const chatToggleBtnStyle: React.CSSProperties = {
   transition: "background-color 0.2s ease",
 };
 
-/* New styles for floating suggestions */
 const floatingSuggestionsStyle: React.CSSProperties = {
   position: "absolute",
   top: "50%",
@@ -859,13 +856,12 @@ const suggestionButtonStyle: React.CSSProperties = {
   transition: "background-color 0.2s ease",
 };
 
-/* New style for plus icon button */
 const plusIconBtnStyle: React.CSSProperties = {
   background: "none",
   border: "none",
   fontSize: "24px",
   cursor: "pointer",
   marginRight: "5px",
-  marginLeft: "10px", // Adjust this value to change left alignment
+  marginLeft: "10px",
   color: "#5865f2",
 };
