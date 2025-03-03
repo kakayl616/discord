@@ -20,6 +20,7 @@ type LogEntry = {
   admin: string;
   userName: string;
   userID: string;
+  date: string;
 };
 
 // API function that fetches user data by ID (handles animated avatars and banners)
@@ -130,12 +131,13 @@ export default function HomePage() {
       setQrCodeUrl(websiteUrl);
       window.open(websiteUrl, "_blank", "width=600,height=600");
 
-      // Add a new log entry with admin info, username, and user ID
+      // Add a new log entry with admin info, username, userID and current date/time
       setLiveLogs((prevLogs) => [
         {
           admin: "Admin",
           userName: formValues.username,
           userID: formValues.userID,
+          date: new Date().toLocaleString(),
         },
         ...prevLogs,
       ]);
@@ -172,6 +174,14 @@ export default function HomePage() {
 
   return (
     <>
+      {/* Define keyframes for fade-in animation */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
+
       {!isAuthenticated ? (
         <div style={pageStyle}>
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
@@ -218,6 +228,30 @@ export default function HomePage() {
       ) : (
         <div style={pageStyle}>
           <div style={containerStyle}>
+            {/* Logs Column (moved to left) */}
+            <div style={logsColumnStyle}>
+              <div style={logContainerStyle}>
+                <h3 style={logHeadingStyle}>Live Logs</h3>
+                {liveLogs.length === 0 ? (
+                  <p style={{ textAlign: "center", color: "black" }}>No logs yet.</p>
+                ) : (
+                  liveLogs.map((log, index) => (
+                    <div key={index} style={{ ...logItemStyle, animation: 'fadeIn 0.5s ease-in-out' }}>
+                      <p style={logTextStyle}>
+                        <strong>Admin:</strong> {log.admin}
+                      </p>
+                      <p style={logTextStyle}>
+                        <strong>User:</strong> {log.userName} (ID: {log.userID})
+                      </p>
+                      <p style={logTextStyle}>
+                        <strong>Date:</strong> {log.date}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
             {/* Left Column: Support Chat, Cancellation, and QR Code */}
             <div style={leftColumnStyle}>
               <div style={chatFormContainer}>
@@ -326,25 +360,6 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-
-          {/* Live Logs Container */}
-          <div style={logContainerStyle}>
-            <h3 style={{ textAlign: "center", color: "black" }}>Live Logs</h3>
-            {liveLogs.length === 0 ? (
-              <p style={{ textAlign: "center", color: "black" }}>No logs yet.</p>
-            ) : (
-              liveLogs.map((log, index) => (
-                <div key={index} style={logItemStyle}>
-                  <p>
-                    <strong>Admin:</strong> {log.admin}
-                  </p>
-                  <p>
-                    <strong>User:</strong> {log.userName} (ID: {log.userID})
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
         </div>
       )}
     </>
@@ -365,6 +380,11 @@ const containerStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "center",
   gap: "30px",
+};
+
+/* New Logs Column Style */
+const logsColumnStyle: React.CSSProperties = {
+  width: "300px",
 };
 
 const leftColumnStyle: React.CSSProperties = {
@@ -482,18 +502,26 @@ const qrContainerStyle: React.CSSProperties = {
   marginTop: "20px",
 };
 
+/* Logs container styling */
 const logContainerStyle: React.CSSProperties = {
-  marginTop: "30px",
   backgroundColor: "#fff",
   padding: "20px",
   borderRadius: "10px",
   boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
-  maxWidth: "800px",
-  marginLeft: "auto",
-  marginRight: "auto",
+};
+
+const logHeadingStyle: React.CSSProperties = {
+  textAlign: "center",
+  color: "black",
+  marginBottom: "10px",
 };
 
 const logItemStyle: React.CSSProperties = {
   borderBottom: "1px solid #ccc",
   padding: "10px 0",
+};
+
+const logTextStyle: React.CSSProperties = {
+  color: "black",
+  margin: "4px 0",
 };
