@@ -1,3 +1,5 @@
+"use client"; // Mark this page as a client component
+
 import Head from "next/head";
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -7,7 +9,7 @@ import { doc, getDoc } from "firebase/firestore";
 type UserData = {
   userID: string;
   username: string;
-  // ... other fields
+  // other fields...
 };
 
 export default function UserPage() {
@@ -18,8 +20,9 @@ export default function UserPage() {
   useEffect(() => {
     async function fetchData() {
       if (!id) return;
+      const userId = Array.isArray(id) ? id[0] : id;
       try {
-        const docRef = doc(db, "users", Array.isArray(id) ? id[0] : id);
+        const docRef = doc(db, "users", userId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setData(docSnap.data() as UserData);
@@ -35,19 +38,11 @@ export default function UserPage() {
   return (
     <>
       <Head>
-        {/* If the username is available, the title becomes "Discord | Username" */}
         <title>{data ? `Discord | ${data.username}` : "Discord"}</title>
         <link rel="icon" href="/img/discord.png" />
       </Head>
       <div>
-        {/* Your page content goes here */}
-        {loading ? (
-          <p>Loading...</p>
-        ) : data ? (
-          <h1>Welcome, {data.username}!</h1>
-        ) : (
-          <p>User not found.</p>
-        )}
+        {loading ? <p>Loading...</p> : data ? <h1>Welcome, {data.username}!</h1> : <p>User not found.</p>}
       </div>
     </>
   );
