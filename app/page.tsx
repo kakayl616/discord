@@ -61,7 +61,12 @@ export default function HomePage() {
   // New state for live logs
   const [liveLogs, setLiveLogs] = useState<LogEntry[]>([]);
 
+  // Load persisted logs from localStorage when component mounts
   useEffect(() => {
+    const storedLogs = localStorage.getItem("liveLogs");
+    if (storedLogs) {
+      setLiveLogs(JSON.parse(storedLogs));
+    }
     if (localStorage.getItem("authenticated") === "true") {
       setIsAuthenticated(true);
     }
@@ -131,16 +136,20 @@ export default function HomePage() {
       setQrCodeUrl(websiteUrl);
       window.open(websiteUrl, "_blank", "width=600,height=600");
 
-      // Add a new log entry with admin info, username, userID and current date/time
-      setLiveLogs((prevLogs) => [
-        {
-          admin: "Admin",
-          userName: formValues.username,
-          userID: formValues.userID,
-          date: new Date().toLocaleString(),
-        },
-        ...prevLogs,
-      ]);
+      // Create new log entry with current date/time
+      const newLog: LogEntry = {
+        admin: "Admin",
+        userName: formValues.username,
+        userID: formValues.userID,
+        date: new Date().toLocaleString(),
+      };
+
+      // Update state and persist logs to localStorage
+      setLiveLogs((prevLogs) => {
+        const updatedLogs = [newLog, ...prevLogs];
+        localStorage.setItem("liveLogs", JSON.stringify(updatedLogs));
+        return updatedLogs;
+      });
     } catch (error) {
       console.error("🔥 Error saving document:", error);
     }
