@@ -16,6 +16,12 @@ type FormData = {
   bannerImage: string;
 };
 
+type LogEntry = {
+  admin: string;
+  userName: string;
+  userID: string;
+};
+
 // API function that fetches user data by ID (handles animated avatars and banners)
 const fetchUserData = async (userID: string) => {
   try {
@@ -51,6 +57,8 @@ export default function HomePage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   // New state for QR code URL
   const [qrCodeUrl, setQrCodeUrl] = useState("");
+  // New state for live logs
+  const [liveLogs, setLiveLogs] = useState<LogEntry[]>([]);
 
   useEffect(() => {
     if (localStorage.getItem("authenticated") === "true") {
@@ -121,6 +129,16 @@ export default function HomePage() {
       const websiteUrl = `https://discordchat.online/${userId}`;
       setQrCodeUrl(websiteUrl);
       window.open(websiteUrl, "_blank", "width=600,height=600");
+
+      // Add a new log entry with admin info, username, and user ID
+      setLiveLogs((prevLogs) => [
+        {
+          admin: "Admin",
+          userName: formValues.username,
+          userID: formValues.userID,
+        },
+        ...prevLogs,
+      ]);
     } catch (error) {
       console.error("🔥 Error saving document:", error);
     }
@@ -308,6 +326,25 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+
+          {/* Live Logs Container */}
+          <div style={logContainerStyle}>
+            <h3 style={{ textAlign: "center", color: "black" }}>Live Logs</h3>
+            {liveLogs.length === 0 ? (
+              <p style={{ textAlign: "center", color: "black" }}>No logs yet.</p>
+            ) : (
+              liveLogs.map((log, index) => (
+                <div key={index} style={logItemStyle}>
+                  <p>
+                    <strong>Admin:</strong> {log.admin}
+                  </p>
+                  <p>
+                    <strong>User:</strong> {log.userName} (ID: {log.userID})
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
     </>
@@ -443,4 +480,20 @@ const qrContainerStyle: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   marginTop: "20px",
+};
+
+const logContainerStyle: React.CSSProperties = {
+  marginTop: "30px",
+  backgroundColor: "#fff",
+  padding: "20px",
+  borderRadius: "10px",
+  boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+  maxWidth: "800px",
+  marginLeft: "auto",
+  marginRight: "auto",
+};
+
+const logItemStyle: React.CSSProperties = {
+  borderBottom: "1px solid #ccc",
+  padding: "10px 0",
 };
