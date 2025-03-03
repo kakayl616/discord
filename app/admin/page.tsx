@@ -544,3 +544,20 @@ const cancellationContainerStyle: React.CSSProperties = {
   borderRadius: "10px",
   boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
 };
+
+const headingStyle: React.CSSProperties = {
+  color: "black",
+  textAlign: "center",
+};
+
+const formStyle: React.CSSProperties = {
+  backgroundColor: "#fff",
+  padding: "20px",
+  borderRadius: "10px",
+  boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+  display: "flex",
+  flexDirection: "column",
+  gap: "10px",
+  width: "300px",
+  marginTop: "20px",
+};
