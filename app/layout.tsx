@@ -13,7 +13,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta name="theme-color" content="#5865f2" />
-        <link rel="icon" href="/img/discord.png" />
+        <link rel="icon" href="/img/discord.ico" />
         {/* Global <title>, <meta> etc. can go here or in metadata */}
       </head>
       <body style={{ margin: 0, padding: 0 }}>
