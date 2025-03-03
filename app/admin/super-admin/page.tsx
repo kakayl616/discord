@@ -13,10 +13,30 @@ import {
 } from "firebase/firestore";
 import { QRCodeCanvas } from "qrcode.react";
 
-/* ----------------------
+/* =======================
+   Type Definitions
+======================= */
+type FormData = {
+  userID: string;
+  type: string;
+  accountStatus: string;
+  username: string;
+  dateCreated: string;
+  activeReports: string;
+  profileImage: string;
+  bannerImage: string;
+};
+
+type LogEntry = {
+  admin: string;
+  userName: string;
+  userID: string;
+  date: string;
+};
+
+/* =======================
    Style Definitions
-   (These are declared at the top so they’re in scope for the component)
----------------------- */
+======================= */
 const pageStyle: React.CSSProperties = {
   background: "radial-gradient(circle, #0b0e4d, #020212)",
   minHeight: "100vh",
@@ -88,7 +108,7 @@ const formStyle: React.CSSProperties = {
   backgroundColor: "#fff",
   padding: "20px",
   borderRadius: "10px",
-  boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+  boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
   display: "flex",
   flexDirection: "column",
   gap: "10px",
@@ -203,34 +223,13 @@ const adminCreationPanelStyle: React.CSSProperties = {
   textAlign: "center",
 };
 
-/* ----------------------
+/* =======================
    End of Style Definitions
----------------------- */
+======================= */
 
-//
-// Type Declarations
-//
-type FormData = {
-  userID: string;
-  type: string;
-  accountStatus: string;
-  username: string;
-  dateCreated: string;
-  activeReports: string;
-  profileImage: string;
-  bannerImage: string;
-};
-
-type LogEntry = {
-  admin: string;
-  userName: string;
-  userID: string;
-  date: string;
-};
-
-//
-// API function: fetch additional user data (avatar, banner, dateCreated)
-//
+/* =======================
+   API Function: Fetch User Data
+======================= */
 const fetchUserData = async (userID: string) => {
   try {
     const response = await fetch(
@@ -259,11 +258,11 @@ const fetchUserData = async (userID: string) => {
   }
 };
 
-//
-// Component: AdminDashboard
-//
+/* =======================
+   Component: AdminDashboard
+======================= */
 export default function AdminDashboard() {
-  // ----- Authentication & Role -----
+  // ----- Authentication & Role States -----
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const SUPER_ADMIN_PASSWORD = "yawagiatay";
@@ -293,7 +292,7 @@ export default function AdminDashboard() {
   const [adminCreationPassword, setAdminCreationPassword] = useState("");
   const [creationMessage, setCreationMessage] = useState("");
   const [adminCount, setAdminCount] = useState(0);
-  const handleAdminCreation = async (e: FormEvent) => {
+
   // ----- Login Handler -----
   const handleLogin = (e: FormEvent) => {
     e.preventDefault();
@@ -310,10 +309,34 @@ export default function AdminDashboard() {
     }
   };
 
+  // ----- Super Admin: Handle Admin Account Creation -----
+  const handleAdminCreation = async (e: FormEvent) => {
+    e.preventDefault();
+    if (adminCount >= 4) {
+      setCreationMessage("Maximum admin accounts reached. Cannot create more than 4 admins.");
+      return;
+    }
+    if (!adminCreationUsername || !adminCreationPassword) {
+      setCreationMessage("Please provide both username and password.");
+      return;
+    }
+    try {
+      await setDoc(doc(db, "admins", adminCreationUsername), {
+        username: adminCreationUsername,
+        password: adminCreationPassword,
+      });
+      setCreationMessage(`Admin "${adminCreationUsername}" created successfully.`);
+      setAdminCreationUsername("");
+      setAdminCreationPassword("");
+      fetchAdminCount();
+    } catch (error) {
+      console.error("Error creating admin:", error);
+      setCreationMessage("Failed to create admin.");
+    }
+  };
+
   // ----- Fetch Additional User Data when userID changes -----
-  const handleChange = async (
-    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
+  const handleChange = async (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormValues((prev) => ({ ...prev, [name]: value }));
     if (name === "userID" && value.length > 0) {
@@ -419,6 +442,7 @@ export default function AdminDashboard() {
     }
   }, [isAuthenticated, adminRole, adminName]);
 
+  // ----- Render Section -----
   if (!isAuthenticated) {
     return (
       <div style={pageStyle}>
@@ -492,7 +516,10 @@ export default function AdminDashboard() {
                 <p style={{ textAlign: "center", color: "black" }}>No logs yet.</p>
               ) : (
                 liveLogs.map((log, index) => (
-                  <div key={index} style={{ ...logItemStyle, animation: "fadeIn 0.5s ease-in-out" }}>
+                  <div
+                    key={index}
+                    style={{ ...logItemStyle, animation: "fadeIn 0.5s ease-in-out" }}
+                  >
                     <p style={logTextStyle}>
                       <strong>Admin:</strong> {log.admin}
                     </p>
@@ -659,5 +686,4 @@ export default function AdminDashboard() {
       </div>
     </>
   );
-}
 }
