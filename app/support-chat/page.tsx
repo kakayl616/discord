@@ -17,6 +17,8 @@ import {
   orderBy,
   onSnapshot,
   addDoc,
+  updateDoc,
+  deleteDoc,
   serverTimestamp,
   Timestamp,
   QuerySnapshot,
@@ -119,11 +121,14 @@ function ChatContent() {
   const [loading, setLoading] = useState(false);
   const [containerLoaded, setContainerLoaded] = useState(false);
 
-  // Pre-composed messages state and editing controls
-  const [preComposedMessages, setPreComposedMessages] = useState<PreComposedMessage[]>([]);
+  // Pre-composed messages editing controls
   const [newPreComposed, setNewPreComposed] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
+
+  const [preComposedMessages, setPreComposedMessages] = useState<
+    PreComposedMessage[]
+  >([]);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -165,6 +170,19 @@ function ChatContent() {
     });
     return () => unsubscribe();
   }, [transactionId]);
+
+  // Listen for pre-composed messages updates from Firebase
+  useEffect(() => {
+    const preComposedRef = collection(db, "precomposedMessages");
+    const unsubscribe = onSnapshot(preComposedRef, (snapshot) => {
+      const msgs = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setPreComposedMessages(msgs as PreComposedMessage[]);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -250,13 +268,18 @@ function ChatContent() {
     }
   };
 
-  // Pre-composed messages functions
-  const addPreComposedMessage = () => {
+  // Pre-composed messages functions using Firebase
+  const addPreComposedMessage = async () => {
     const trimmed = newPreComposed.trim();
     if (!trimmed) return;
-    const newMsg: PreComposedMessage = { id: Date.now().toString(), text: trimmed };
-    setPreComposedMessages((prev) => [...prev, newMsg]);
-    setNewPreComposed("");
+    try {
+      await addDoc(collection(db, "precomposedMessages"), {
+        text: trimmed,
+      });
+      setNewPreComposed("");
+    } catch (error) {
+      console.error("Error adding pre-composed message:", error);
+    }
   };
 
   const editPreComposedMessage = (id: string) => {
@@ -267,16 +290,22 @@ function ChatContent() {
     }
   };
 
-  const saveEditedPreComposedMessage = (id: string) => {
-    setPreComposedMessages((prev) =>
-      prev.map((msg) => (msg.id === id ? { ...msg, text: editingText } : msg))
-    );
-    setEditingId(null);
-    setEditingText("");
+  const saveEditedPreComposedMessage = async (id: string) => {
+    try {
+      await updateDoc(doc(db, "precomposedMessages", id), { text: editingText });
+      setEditingId(null);
+      setEditingText("");
+    } catch (error) {
+      console.error("Error updating pre-composed message:", error);
+    }
   };
 
-  const deletePreComposedMessage = (id: string) => {
-    setPreComposedMessages((prev) => prev.filter((msg) => msg.id !== id));
+  const deletePreComposedMessage = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "precomposedMessages", id));
+    } catch (error) {
+      console.error("Error deleting pre-composed message:", error);
+    }
   };
 
   return (
