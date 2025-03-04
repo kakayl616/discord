@@ -337,6 +337,7 @@ function ChatContent() {
                         padding: "5px",
                         borderRadius: "4px",
                         border: "1px solid #ccc",
+                        color: "black",
                       }}
                     />
                     <button
@@ -381,6 +382,7 @@ function ChatContent() {
                   padding: "8px",
                   borderRadius: "4px",
                   border: "1px solid #ccc",
+                  color: "black",
                 }}
               />
               <button
@@ -582,6 +584,7 @@ const chatInputStyle: React.CSSProperties = {
   outline: "none",
   transition: "all 0.3s ease",
   resize: "none",
+  color: "black",
 };
 
 const chatSendStyle: React.CSSProperties = {
