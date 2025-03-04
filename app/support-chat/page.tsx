@@ -350,7 +350,7 @@ function ChatContent() {
                 ) : (
                   <>
                     <span
-                      style={{ flex: 1, cursor: "pointer" }}
+                      style={{ flex: 1, cursor: "pointer", color: "black"}}
                       onClick={() => sendMessage(msg.text)}
                     >
                       {msg.text}
