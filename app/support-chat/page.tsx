@@ -98,9 +98,15 @@ function ChatContent() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
   const [containerLoaded, setContainerLoaded] = useState(false);
-  // Removed preComposedMessages state as it was unused:
-  // const [preComposedMessages, setPreComposedMessages] = useState<PreComposedMessage[]>([]);
+  
+  // Pre-composed messages state and editing controls
+  const [preComposedMessages, setPreComposedMessages] = useState<PreComposedMessage[]>([]);
+  const [newPreComposed, setNewPreComposed] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setContainerLoaded(true);
@@ -152,12 +158,25 @@ function ChatContent() {
     transition: "opacity 0.5s ease-out, transform 0.5s ease-out",
   };
 
+  // Optimistic message sending (no delay)
   const sendMessage = async (
     text: string,
     messageType: Message["messageType"] = "text"
   ) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    // Optimistically add the message locally
+    const optimisticMessage: Message = {
+      id: "temp-" + Date.now(),
+      sender: role,
+      text: trimmed,
+      messageType,
+      timestamp: Timestamp.now(),
+      transactionId,
+    };
+    setMessages((prev) => [...prev, optimisticMessage]);
+
     try {
       await addDoc(collection(db, "messages"), {
         transactionId,
@@ -175,6 +194,9 @@ function ChatContent() {
     e.preventDefault();
     await sendMessage(chatInput);
     setChatInput("");
+    if (chatInputRef.current) {
+      chatInputRef.current.style.height = "auto";
+    }
   };
 
   const handleSendSecureFormRequest = async () => {
@@ -199,6 +221,44 @@ function ChatContent() {
     return <span>{msg.text}</span>;
   };
 
+  // Handle auto-resizing of the textarea
+  const handleChatInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    setChatInput(e.target.value);
+    if (chatInputRef.current) {
+      chatInputRef.current.style.height = "auto";
+      chatInputRef.current.style.height = chatInputRef.current.scrollHeight + "px";
+    }
+  };
+
+  // Pre-composed messages functions
+  const addPreComposedMessage = () => {
+    const trimmed = newPreComposed.trim();
+    if (!trimmed) return;
+    const newMsg: PreComposedMessage = { id: Date.now().toString(), text: trimmed };
+    setPreComposedMessages((prev) => [...prev, newMsg]);
+    setNewPreComposed("");
+  };
+
+  const editPreComposedMessage = (id: string) => {
+    const msg = preComposedMessages.find((m) => m.id === id);
+    if (msg) {
+      setEditingId(id);
+      setEditingText(msg.text);
+    }
+  };
+
+  const saveEditedPreComposedMessage = (id: string) => {
+    setPreComposedMessages((prev) =>
+      prev.map((msg) => (msg.id === id ? { ...msg, text: editingText } : msg))
+    );
+    setEditingId(null);
+    setEditingText("");
+  };
+
+  const deletePreComposedMessage = (id: string) => {
+    setPreComposedMessages((prev) => prev.filter((msg) => msg.id !== id));
+  };
+
   return (
     <div style={chatPageStyle}>
       {!transactionId || transactionId === "support-chat" ? (
@@ -209,6 +269,57 @@ function ChatContent() {
         </h2>
       ) : (
         <div style={{ ...chatWrapperStyle, ...containerAnimationStyle }}>
+          {/* Pre-Composed Messages Panel */}
+          <div style={preComposedContainerStyle}>
+            <h3 style={{ textAlign: "center" }}>Scripts</h3>
+            {preComposedMessages.map((msg) => (
+              <div key={msg.id} style={preComposedMessageStyle}>
+                {editingId === msg.id ? (
+                  <>
+                    <input
+                      type="text"
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                      style={{ flex: 1, marginRight: "5px" }}
+                    />
+                    <button onClick={() => saveEditedPreComposedMessage(msg.id)}>
+                      Save
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      style={{ flex: 1, cursor: "pointer" }}
+                      onClick={() => sendMessage(msg.text)}
+                    >
+                      {msg.text}
+                    </span>
+                    <button onClick={() => editPreComposedMessage(msg.id)}>Edit</button>
+                    <button onClick={() => deletePreComposedMessage(msg.id)}>
+                      Delete
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+            <div style={{ marginTop: "10px" }}>
+              <input
+                type="text"
+                value={newPreComposed}
+                onChange={(e) => setNewPreComposed(e.target.value)}
+                placeholder="New script message"
+                style={{ width: "100%", padding: "5px" }}
+              />
+              <button
+                onClick={addPreComposedMessage}
+                style={{ width: "100%", padding: "5px", marginTop: "5px" }}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
+          {/* Chat Container */}
           <div style={chatContainerStyle}>
             <div style={chatHeaderStyle}>
               Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
@@ -235,14 +346,13 @@ function ChatContent() {
               <div ref={messagesEndRef} />
             </div>
             <form onSubmit={handleSend} style={chatInputContainerStyle}>
-              <input
-                type="text"
+              <textarea
+                ref={chatInputRef}
                 value={chatInput}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  setChatInput(e.target.value)
-                }
+                onChange={handleChatInputChange}
                 placeholder="Type your message..."
-                style={{ ...chatInputStyle, color: "black" }}
+                style={{ ...chatInputStyle, color: "black", resize: "none" }}
+                rows={1}
               />
               <button type="submit" style={chatSendStyle}>
                 Send
@@ -306,6 +416,26 @@ const chatWrapperStyle: React.CSSProperties = {
   boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
 };
 
+const preComposedContainerStyle: React.CSSProperties = {
+  width: "300px",
+  height: "100%",
+  backgroundColor: "#e0e0e0",
+  padding: "10px",
+  overflowY: "auto",
+  borderRight: "1px solid #ccc",
+};
+
+const preComposedMessageStyle: React.CSSProperties = {
+  padding: "8px",
+  marginBottom: "8px",
+  backgroundColor: "#fff",
+  borderRadius: "5px",
+  cursor: "pointer",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+};
+
 const chatContainerStyle: React.CSSProperties = {
   width: "500px",
   height: "100%",
@@ -334,6 +464,7 @@ const chatInputContainerStyle: React.CSSProperties = {
   display: "flex",
   borderTop: "1px solid #ccc",
   alignItems: "center",
+  padding: "5px",
 };
 
 const chatInputStyle: React.CSSProperties = {
@@ -342,7 +473,6 @@ const chatInputStyle: React.CSSProperties = {
   padding: "10px",
   fontSize: "16px",
   outline: "none",
-  color: "black",
 };
 
 const chatSendStyle: React.CSSProperties = {
