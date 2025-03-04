@@ -108,7 +108,7 @@ const formStyle: React.CSSProperties = {
   backgroundColor: "#fff",
   padding: "20px",
   borderRadius: "10px",
-  boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+  boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
   display: "flex",
   flexDirection: "column",
   gap: "10px",
@@ -267,8 +267,22 @@ export default function AdminDashboard() {
   const [passwordInput, setPasswordInput] = useState("");
   const SUPER_ADMIN_PASSWORD = "yawagiatay";
   const ADMIN_PASSWORD = "babypink";
-  const [adminRole, setAdminRole] = useState<"admin" | "superAdmin" | null>(null);
+  const [adminRole, setAdminRole] = useState<"admin" | "superAdmin" | null>(
+    null
+  );
   const [adminName, setAdminName] = useState("");
+
+  // Persist authentication on mount
+  useEffect(() => {
+    const storedAuth = localStorage.getItem("isAuthenticated");
+    const storedRole = localStorage.getItem("adminRole");
+    const storedName = localStorage.getItem("adminName");
+    if (storedAuth === "true" && storedRole && storedName) {
+      setIsAuthenticated(true);
+      setAdminRole(storedRole as "admin" | "superAdmin");
+      setAdminName(storedName);
+    }
+  }, []);
 
   // ----- Dashboard States -----
   const [formValues, setFormValues] = useState<FormData>({
@@ -300,16 +314,21 @@ export default function AdminDashboard() {
       setIsAuthenticated(true);
       setAdminRole("superAdmin");
       setAdminName("Super Admin");
+      localStorage.setItem("isAuthenticated", "true");
+      localStorage.setItem("adminRole", "superAdmin");
+      localStorage.setItem("adminName", "Super Admin");
     } else if (passwordInput === ADMIN_PASSWORD) {
       setIsAuthenticated(true);
       setAdminRole("admin");
       setAdminName("Admin");
+      localStorage.setItem("isAuthenticated", "true");
+      localStorage.setItem("adminRole", "admin");
+      localStorage.setItem("adminName", "Admin");
     } else {
       alert("Incorrect password!");
     }
   };
 
-  // ----- Super Admin: Handle Admin Account Creation -----
   const handleAdminCreation = async (e: FormEvent) => {
     e.preventDefault();
     if (adminCount >= 4) {
@@ -336,7 +355,9 @@ export default function AdminDashboard() {
   };
 
   // ----- Fetch Additional User Data when userID changes -----
-  const handleChange = async (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = async (
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
     setFormValues((prev) => ({ ...prev, [name]: value }));
     if (name === "userID" && value.length > 0) {
