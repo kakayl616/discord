@@ -67,7 +67,7 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
       onSubmit={handleSubmit}
       style={{ textAlign: "center", marginTop: "50px" }}
     >
-      <h2 style={{ color: "black" }}>
+      <h2 style={{ color: "#5865F2" }}>
         Please enter a valid transaction ID:
       </h2>
       <input
@@ -75,9 +75,29 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
         value={input}
         onChange={(e: ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
         placeholder="Enter Transaction ID"
-        style={{ padding: "10px", fontSize: "16px", color: "black" }}
+        style={{
+          padding: "10px",
+          fontSize: "16px",
+          color: "black",
+          border: "1px solid #ccc",
+          borderRadius: "4px",
+          width: "80%",
+          maxWidth: "300px",
+        }}
       />
-      <button type="submit" style={{ padding: "10px 20px", marginLeft: "10px" }}>
+      <button
+        type="submit"
+        style={{
+          padding: "10px 20px",
+          marginLeft: "10px",
+          border: "none",
+          backgroundColor: "#5865F2",
+          color: "#fff",
+          borderRadius: "4px",
+          cursor: "pointer",
+          transition: "background-color 0.3s ease",
+        }}
+      >
         Submit
       </button>
     </form>
@@ -98,7 +118,7 @@ function ChatContent() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
   const [containerLoaded, setContainerLoaded] = useState(false);
-  
+
   // Pre-composed messages state and editing controls
   const [preComposedMessages, setPreComposedMessages] = useState<PreComposedMessage[]>([]);
   const [newPreComposed, setNewPreComposed] = useState("");
@@ -264,14 +284,16 @@ function ChatContent() {
       {!transactionId || transactionId === "support-chat" ? (
         <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />
       ) : loading ? (
-        <h2 style={{ textAlign: "center", marginTop: "50px", color: "black" }}>
+        <h2 style={{ textAlign: "center", marginTop: "50px", color: "#5865F2" }}>
           Loading...
         </h2>
       ) : (
         <div style={{ ...chatWrapperStyle, ...containerAnimationStyle }}>
           {/* Pre-Composed Messages Panel */}
           <div style={preComposedContainerStyle}>
-            <h3 style={{ textAlign: "center" }}>Scripts</h3>
+            <h3 style={{ textAlign: "center", color: "#5865F2", marginBottom: "20px" }}>
+              Scripts
+            </h3>
             {preComposedMessages.map((msg) => (
               <div key={msg.id} style={preComposedMessageStyle}>
                 {editingId === msg.id ? (
@@ -280,9 +302,18 @@ function ChatContent() {
                       type="text"
                       value={editingText}
                       onChange={(e) => setEditingText(e.target.value)}
-                      style={{ flex: 1, marginRight: "5px" }}
+                      style={{
+                        flex: 1,
+                        marginRight: "5px",
+                        padding: "5px",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                      }}
                     />
-                    <button onClick={() => saveEditedPreComposedMessage(msg.id)}>
+                    <button
+                      onClick={() => saveEditedPreComposedMessage(msg.id)}
+                      style={preComposedButtonStyle}
+                    >
                       Save
                     </button>
                   </>
@@ -294,25 +325,48 @@ function ChatContent() {
                     >
                       {msg.text}
                     </span>
-                    <button onClick={() => editPreComposedMessage(msg.id)}>Edit</button>
-                    <button onClick={() => deletePreComposedMessage(msg.id)}>
+                    <button
+                      onClick={() => editPreComposedMessage(msg.id)}
+                      style={preComposedButtonStyle}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deletePreComposedMessage(msg.id)}
+                      style={preComposedButtonStyle}
+                    >
                       Delete
                     </button>
                   </>
                 )}
               </div>
             ))}
-            <div style={{ marginTop: "10px" }}>
+            <div style={{ marginTop: "20px" }}>
               <input
                 type="text"
                 value={newPreComposed}
                 onChange={(e) => setNewPreComposed(e.target.value)}
                 placeholder="New script message"
-                style={{ width: "100%", padding: "5px" }}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: "4px",
+                  border: "1px solid #ccc",
+                }}
               />
               <button
                 onClick={addPreComposedMessage}
-                style={{ width: "100%", padding: "5px", marginTop: "5px" }}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  marginTop: "8px",
+                  borderRadius: "4px",
+                  backgroundColor: "#5865F2",
+                  color: "#fff",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "background-color 0.3s ease",
+                }}
               >
                 Add
               </button>
@@ -329,15 +383,16 @@ function ChatContent() {
                 <div
                   key={msg.id}
                   style={{
-                    margin: "10px",
+                    margin: "10px 0",
                     padding: "10px 15px",
                     borderRadius: "15px",
                     maxWidth: "70%",
                     wordWrap: "break-word",
                     fontSize: "15px",
-                    backgroundColor: "#5865f2",
-                    color: "white",
+                    backgroundColor: "#5865F2",
+                    color: "#fff",
                     alignSelf: "flex-end",
+                    transition: "transform 0.2s ease",
                   }}
                 >
                   <strong>{msg.sender}:</strong> {renderMessageContent(msg)}
@@ -351,7 +406,7 @@ function ChatContent() {
                 value={chatInput}
                 onChange={handleChatInputChange}
                 placeholder="Type your message..."
-                style={{ ...chatInputStyle, color: "black", resize: "none" }}
+                style={chatInputStyle}
                 rows={1}
               />
               <button type="submit" style={chatSendStyle}>
@@ -362,8 +417,8 @@ function ChatContent() {
                 onClick={handleSendSecureFormRequest}
                 style={{
                   ...chatSendStyle,
-                  marginLeft: "5px",
                   backgroundColor: "#28a745",
+                  marginLeft: "10px",
                 }}
               >
                 Secure Form
@@ -384,7 +439,7 @@ export default function SupportChat() {
           style={{
             textAlign: "center",
             marginTop: "50px",
-            color: "black",
+            color: "#5865F2",
           }}
         >
           Loading chat...
@@ -402,84 +457,112 @@ export default function SupportChat() {
 const chatPageStyle: React.CSSProperties = {
   margin: 0,
   fontFamily: "sans-serif",
-  backgroundColor: "#f1f1f1",
+  backgroundColor: "#E0E3FF", // Light Blurple
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  height: "100vh",
+  minHeight: "100vh",
+  padding: "20px",
+  boxSizing: "border-box",
 };
 
 const chatWrapperStyle: React.CSSProperties = {
   display: "flex",
-  width: "800px",
-  height: "600px",
-  boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+  width: "100%",
+  maxWidth: "1200px",
+  height: "80vh",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+  borderRadius: "8px",
+  overflow: "hidden",
+  backgroundColor: "#fff",
 };
 
 const preComposedContainerStyle: React.CSSProperties = {
-  width: "300px",
-  height: "100%",
-  backgroundColor: "#e0e0e0",
-  padding: "10px",
+  width: "30%",
+  minWidth: "250px",
+  backgroundColor: "#E0E3FF", // Light Blurple
+  padding: "20px",
   overflowY: "auto",
-  borderRight: "1px solid #ccc",
+  borderRight: "2px solid #5865F2",
+  transition: "all 0.3s ease",
 };
 
 const preComposedMessageStyle: React.CSSProperties = {
-  padding: "8px",
-  marginBottom: "8px",
+  padding: "10px",
+  marginBottom: "10px",
   backgroundColor: "#fff",
   borderRadius: "5px",
   cursor: "pointer",
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
+  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+  transition: "transform 0.2s ease",
+};
+
+const preComposedButtonStyle: React.CSSProperties = {
+  border: "none",
+  backgroundColor: "#5865F2",
+  color: "#fff",
+  padding: "6px 10px",
+  borderRadius: "4px",
+  cursor: "pointer",
+  fontSize: "14px",
+  marginLeft: "5px",
+  transition: "background-color 0.3s ease, transform 0.2s ease",
 };
 
 const chatContainerStyle: React.CSSProperties = {
-  width: "500px",
-  height: "100%",
-  backgroundColor: "white",
+  width: "70%",
   display: "flex",
   flexDirection: "column",
-  overflow: "hidden",
+  backgroundColor: "#fff",
 };
 
 const chatHeaderStyle: React.CSSProperties = {
-  backgroundColor: "#5865f2",
-  color: "white",
+  backgroundColor: "#5865F2",
+  color: "#fff",
   padding: "15px",
   textAlign: "center",
-  fontSize: "18px",
+  fontSize: "20px",
+  fontWeight: "bold",
+  transition: "background-color 0.3s ease",
 };
 
 const chatMessagesStyle: React.CSSProperties = {
   flex: 1,
-  padding: "10px",
+  padding: "20px",
   overflowY: "auto",
-  background: "#fafafa",
+  backgroundColor: "#f9f9f9",
 };
 
 const chatInputContainerStyle: React.CSSProperties = {
   display: "flex",
   borderTop: "1px solid #ccc",
   alignItems: "center",
-  padding: "5px",
+  padding: "10px",
+  transition: "all 0.3s ease",
 };
 
 const chatInputStyle: React.CSSProperties = {
   flex: 1,
-  border: "none",
+  border: "1px solid #ccc",
+  borderRadius: "4px",
   padding: "10px",
   fontSize: "16px",
   outline: "none",
+  transition: "all 0.3s ease",
+  resize: "none",
 };
 
 const chatSendStyle: React.CSSProperties = {
   border: "none",
-  backgroundColor: "#5865f2",
-  color: "white",
+  backgroundColor: "#5865F2",
+  color: "#fff",
   padding: "10px 20px",
+  marginLeft: "10px",
   cursor: "pointer",
   fontSize: "16px",
+  borderRadius: "4px",
+  transition: "background-color 0.3s ease, transform 0.2s ease",
 };
