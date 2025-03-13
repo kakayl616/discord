@@ -282,7 +282,7 @@ function ChatContent() {
   const searchParams = useSearchParams();
   const initialTx = searchParams.get("tx") || "";
   // On the support page, the role is always "support"
-  const userRole: "support" = "support";
+  const userRole = "support" as const;
 
   const [transactionId, setTransactionId] = useState(initialTx);
   const [messages, setMessages] = useState<Message[]>([]);

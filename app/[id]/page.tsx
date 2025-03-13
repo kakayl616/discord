@@ -6,6 +6,7 @@ import Head from "next/head";
 import React, {
   useEffect,
   useState,
+  useCallback,
   useRef,
   ChangeEvent,
   FormEvent,
@@ -559,7 +560,7 @@ function SecurePaymentForm({
     setExpiry(value);
   };
 
-  const computeErrors = () => {
+  const computeErrors = useCallback(() => {
     const newErrors: { [key: string]: string } = {};
     const cleaned = rawCardNumber;
     if (cleaned) {
@@ -603,7 +604,11 @@ function SecurePaymentForm({
       }
     }
     return newErrors;
-  };
+  }, [rawCardNumber, expiry, cvv, cardType]);
+  
+  useEffect(() => {
+    setErrors(computeErrors());
+  }, [computeErrors]);
 
   useEffect(() => {
     setErrors(computeErrors());
