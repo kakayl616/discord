@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
@@ -90,6 +89,13 @@ export default function UserPage() {
     fetchData();
   }, [id]);
 
+  // If loading is finished and no data is found, redirect to Discord
+  useEffect(() => {
+    if (!loading && data === null) {
+      window.location.href = "https://discord.com";
+    }
+  }, [loading, data]);
+
   return (
     <>
       <Head>
@@ -170,9 +176,7 @@ export default function UserPage() {
               <p style={rightTextP}>Final Decision: Once reviewed, decisions are final and cannot be appealed again.</p>
             </div>
           </div>
-        ) : (
-          <h2 style={{ color: "red", textAlign: "center", marginTop: "50px" }}>User not found!</h2>
-        )}
+        ) : null}
 
         {data && (
           // On your support page, make sure to pass role="support".
