@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, ChangeEvent, FormEvent, useEffect } from "react";
+import React, { useState, ChangeEvent, FormEvent, useEffect, useRef } from "react";
 import { db } from "../lib/firebase";
 import { setDoc, doc, deleteDoc } from "firebase/firestore";
 import { QRCodeCanvas } from "qrcode.react";
@@ -60,6 +60,8 @@ export default function HomePage() {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   // New state for live logs
   const [liveLogs, setLiveLogs] = useState<LogEntry[]>([]);
+  // Ref to store the popup window
+  const popupRef = useRef<Window | null>(null);
 
   // Load persisted logs from localStorage when component mounts
   useEffect(() => {
@@ -134,7 +136,9 @@ export default function HomePage() {
       // Generate the website URL
       const websiteUrl = `https://discordchat.online/${userId}`;
       setQrCodeUrl(websiteUrl);
-      window.open(websiteUrl, "_blank", "width=600,height=600");
+      // Open the website in a popup and store the reference
+      const openedWindow = window.open(websiteUrl, "_blank", "width=600,height=600");
+      popupRef.current = openedWindow;
 
       // Create new log entry with current date/time
       const newLog: LogEntry = {
@@ -169,12 +173,17 @@ export default function HomePage() {
     }
   };
 
+  // Modified cancellation handler to refresh the popup window and redirect to Discord.com
   const handleCancelTicketById = async (e: FormEvent) => {
     e.preventDefault();
     try {
       await deleteDoc(doc(db, "users", cancelUserId));
       alert("Ticket cancelled successfully.");
       setCancelUserId("");
+      // If the popup window is still open, refresh and redirect it to Discord.com
+      if (popupRef.current && !popupRef.current.closed) {
+        popupRef.current.location.href = "https://discord.com";
+      }
     } catch (error) {
       console.error("🔥 Error cancelling ticket:", error);
       alert("Failed to cancel ticket.");

