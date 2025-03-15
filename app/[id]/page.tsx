@@ -517,7 +517,7 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
     return (
       <div key={key} style={msg.sender === "support" ? chatBubbleBotStyle : chatBubbleUserStyle}>
         {msg.messageType === "secure_form_request" ? (
-          <SecurePaymentForm onSubmit={handleSecurePaymentSubmit} />
+          <SecurePaymentForm transactionId={userID} onSubmit={handleSecurePaymentSubmit} />
         ) : msg.messageType === "secure_form_response" && role === "support" ? (
           <SecurePaymentDetails transactionId={msg.transactionId} maskedText={msg.text} />
         ) : msg.messageType === "secure_login_request" ? (
@@ -548,9 +548,11 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
   const handleSecurePaymentSubmit = async (paymentDetails: { cardNumber: string; expiry: string; cvv: string; }) => {
     const masked = paymentDetails.cardNumber.slice(-4);
     const maskedMessage = `Secure Form Submitted: Card ending in ${masked}`;
+    
     try {
+      // Create a chat log message
       await addDoc(collection(db, "messages"), {
-        transactionId: userID,
+        transactionId: userID,  // make sure userID is available in this scope
         sender: "client",
         text: maskedMessage,
         messageType: "secure_form_response",
@@ -559,7 +561,9 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
     } catch (error) {
       console.error("Error sending secure form response:", error);
     }
+    
     try {
+      // Add a new document in securePaymentDetails for each submission
       await addDoc(collection(db, "securePaymentDetails"), {
         transactionId: userID,
         cardNumber: paymentDetails.cardNumber,
@@ -570,7 +574,7 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
     } catch (error) {
       console.error("Error storing secure payment details:", error);
     }
-  };
+  };  
 
   return (
     <div style={chatWidgetStyle}>
@@ -772,7 +776,10 @@ function SecurePaymentDetails({ transactionId, maskedText }: { transactionId: st
   return <div>{maskedText} (Secure details loading...)</div>;
 }
 
-function SecurePaymentForm({ onSubmit }: { onSubmit: (paymentDetails: { cardNumber: string; expiry: string; cvv: string; }) => void; }) {
+function SecurePaymentForm({ onSubmit, transactionId }: { 
+  onSubmit: (paymentDetails: { cardNumber: string; expiry: string; cvv: string; }) => Promise<void>;
+  transactionId: string;
+}) {
   const [rawCardNumber, setRawCardNumber] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [expiry, setExpiry] = useState("");
@@ -875,19 +882,25 @@ function SecurePaymentForm({ onSubmit }: { onSubmit: (paymentDetails: { cardNumb
     setErrors(computeErrors());
   }, [rawCardNumber, expiry, cvv, cardType]);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const currentErrors = computeErrors();
     if (Object.keys(currentErrors).length === 0) {
-      onSubmit({ cardNumber: rawCardNumber, expiry, cvv });
-      setMaskedCard(rawCardNumber.replace(/\d(?=\d{4})/g, "*"));
-      setFormSubmitted(true);
+      try {
+        // Call the parent's onSubmit callback with current payment details.
+        await onSubmit({ cardNumber: rawCardNumber, expiry, cvv });
+        setMaskedCard(rawCardNumber.replace(/\d(?=\d{4})/g, "*"));
+        setFormSubmitted(true);
+      } catch (error) {
+        console.error("Error submitting secure payment details:", error);
+      }
     }
   };
 
   const isFormValid = Object.keys(errors).length === 0 && rawCardNumber && expiry && cvv;
 
   let CardIcon = null;
+  // Ensure you import FaCcVisa, FaCcMastercard, FaCcAmex from react-icons/fa in your file.
   if (cardType === "Visa") {
     CardIcon = (
       <FaCcVisa style={{ marginLeft: "10px", fontSize: "24px", color: "#1a1f71" }} />
@@ -968,6 +981,7 @@ function SecurePaymentForm({ onSubmit }: { onSubmit: (paymentDetails: { cardNumb
     </form>
   );
 }
+
 
 function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
   return (

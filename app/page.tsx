@@ -21,6 +21,7 @@ type LogEntry = {
   userName: string;
   userID: string;
   date: string;
+  status: "Active" | "Cancelled";
 };
 
 // API function that fetches user data by ID (handles animated avatars and banners)
@@ -60,6 +61,10 @@ export default function HomePage() {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   // New state for live logs
   const [liveLogs, setLiveLogs] = useState<LogEntry[]>([]);
+  // Pagination state for logs
+  const [currentPage, setCurrentPage] = useState(1);
+  const logsPerPage = 8;
+  
   // Ref to store the popup window
   const popupRef = useRef<Window | null>(null);
 
@@ -73,6 +78,14 @@ export default function HomePage() {
       setIsAuthenticated(true);
     }
   }, []);
+
+  // Adjust current page if liveLogs change
+  useEffect(() => {
+    const totalPages = Math.ceil(liveLogs.length / logsPerPage) || 1;
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [liveLogs, currentPage]);
 
   // Generate a random active reports number around 200 (as a string)
   const randomActiveReports = `${Math.floor(Math.random() * 50) + 175}`;
@@ -140,12 +153,13 @@ export default function HomePage() {
       const openedWindow = window.open(websiteUrl, "_blank", "width=600,height=600");
       popupRef.current = openedWindow;
 
-      // Create new log entry with current date/time
+      // Create new log entry with current date/time and status Active
       const newLog: LogEntry = {
         admin: "Admin",
         userName: formValues.username,
         userID: formValues.userID,
         date: new Date().toLocaleString(),
+        status: "Active",
       };
 
       // Update state and persist logs to localStorage
@@ -173,13 +187,20 @@ export default function HomePage() {
     }
   };
 
-  // Modified cancellation handler to refresh the popup window and redirect to Discord.com
+  // Modified cancellation handler to update log status and persist changes to localStorage
   const handleCancelTicketById = async (e: FormEvent) => {
     e.preventDefault();
     try {
       await deleteDoc(doc(db, "users", cancelUserId));
       alert("Ticket cancelled successfully.");
       setCancelUserId("");
+      setLiveLogs((prevLogs) => {
+        const updatedLogs = prevLogs.map((log): LogEntry =>
+          log.userID === cancelUserId ? { ...log, status: "Cancelled" as "Cancelled" } : log
+        );
+        localStorage.setItem("liveLogs", JSON.stringify(updatedLogs));
+        return updatedLogs;
+      });
       // If the popup window is still open, refresh and redirect it to Discord.com
       if (popupRef.current && !popupRef.current.closed) {
         popupRef.current.location.href = "https://discord.com";
@@ -189,6 +210,13 @@ export default function HomePage() {
       alert("Failed to cancel ticket.");
     }
   };
+  
+
+  // Pagination logic for logs
+  const indexOfLastLog = currentPage * logsPerPage;
+  const indexOfFirstLog = indexOfLastLog - logsPerPage;
+  const currentLogs = liveLogs.slice(indexOfFirstLog, indexOfLastLog);
+  const totalPages = Math.ceil(liveLogs.length / logsPerPage);
 
   return (
     <>
@@ -246,14 +274,14 @@ export default function HomePage() {
       ) : (
         <div style={pageStyle}>
           <div style={containerStyle}>
-            {/* Logs Column (moved to left) */}
+            {/* Logs Column (expanded width) */}
             <div style={logsColumnStyle}>
               <div style={logContainerStyle}>
                 <h3 style={logHeadingStyle}>Live Logs</h3>
                 {liveLogs.length === 0 ? (
                   <p style={{ textAlign: "center", color: "black" }}>No logs yet.</p>
                 ) : (
-                  liveLogs.map((log, index) => (
+                  currentLogs.map((log, index) => (
                     <div key={index} style={{ ...logItemStyle, animation: 'fadeIn 0.5s ease-in-out' }}>
                       <p style={logTextStyle}>
                         <strong>Admin:</strong> {log.admin}
@@ -264,8 +292,30 @@ export default function HomePage() {
                       <p style={logTextStyle}>
                         <strong>Date:</strong> {log.date}
                       </p>
+                      <p style={{ ...logTextStyle, color: log.status === "Active" ? "#28a745" : "#ff4d4d" }}>
+                        <strong>Status:</strong> {log.status}
+                      </p>
                     </div>
                   ))
+                )}
+                {liveLogs.length > logsPerPage && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      style={paginationButtonStyle}
+                    >
+                      &#8592; Prev
+                    </button>
+                    <span style={{ color: "black" }}>Page {currentPage} of {totalPages}</span>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      style={paginationButtonStyle}
+                    >
+                      Next &#8594;
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -400,9 +450,9 @@ const containerStyle: React.CSSProperties = {
   gap: "30px",
 };
 
-/* New Logs Column Style */
+/* Updated Logs Column Style (expanded width) */
 const logsColumnStyle: React.CSSProperties = {
-  width: "300px",
+  width: "400px",
 };
 
 const leftColumnStyle: React.CSSProperties = {
@@ -520,7 +570,6 @@ const qrContainerStyle: React.CSSProperties = {
   marginTop: "20px",
 };
 
-/* Logs container styling */
 const logContainerStyle: React.CSSProperties = {
   backgroundColor: "#fff",
   padding: "20px",
@@ -542,4 +591,14 @@ const logItemStyle: React.CSSProperties = {
 const logTextStyle: React.CSSProperties = {
   color: "black",
   margin: "4px 0",
+};
+
+const paginationButtonStyle: React.CSSProperties = {
+  padding: "6px 12px",
+  fontSize: "14px",
+  cursor: "pointer",
+  backgroundColor: "#5865f2",
+  color: "white",
+  border: "none",
+  borderRadius: "5px",
 };
