@@ -30,15 +30,6 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { MdLock, MdDelete, MdEdit, MdCreditCard, MdEmail } from "react-icons/md";
-// Import drag-and-drop components and types
-import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  DropResult,
-  DroppableProvided,
-  DraggableProvided,
-} from "react-beautiful-dnd";
 
 // ---------------------------
 // Data Types
@@ -672,88 +663,86 @@ function ChatContent() {
 
   // Render each message
   const renderMessage = (msg: Message) => {
-  const key = msg.id || Math.random().toString(36).substr(2, 9);
-  const isSupport = msg.sender === "support";
-  const messageContainerStyle: React.CSSProperties = {
-    alignSelf: isSupport ? "flex-end" : "flex-start",
-    margin: "10px 0",
-    padding: "10px 15px",
-    borderRadius: "15px",
-    maxWidth: "70%",
-    wordWrap: "break-word",
-    fontSize: "15px",
-    backgroundColor: "#5865F2",
-    color: "#fff",
-  };
+    const key = msg.id || Math.random().toString(36).substr(2, 9);
+    const isSupport = msg.sender === "support";
+    const messageContainerStyle: React.CSSProperties = {
+      alignSelf: isSupport ? "flex-end" : "flex-start",
+      margin: "10px 0",
+      padding: "10px 15px",
+      borderRadius: "15px",
+      maxWidth: "70%",
+      wordWrap: "break-word",
+      fontSize: "15px",
+      backgroundColor: "#5865F2",
+      color: "#fff",
+    };
 
-  if (isSupport && editingMessageId === msg.id) {
+    if (isSupport && editingMessageId === msg.id) {
+      return (
+        <div key={key} style={messageContainerStyle}>
+          <textarea
+            value={editingMessageText}
+            onChange={(e) => setEditingMessageText(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "5px",
+              borderRadius: "8px",
+              border: "none",
+              color: "black",
+              fontSize: "15px",
+              minHeight: "60px", // Ensures the editing container remains tall enough
+              resize: "vertical", // Allows the user to adjust the height if needed
+            }}
+            rows={3} // Provides an initial height for multi-line editing
+          />
+          <div style={{ marginTop: "5px" }}>
+            <button onClick={() => saveEditedMessage(msg.id!)} style={chatSendStyle}>
+              Save
+            </button>
+            <button
+              onClick={() => setEditingMessageId(null)}
+              style={{ ...chatSendStyle, backgroundColor: "#ccc", marginLeft: "5px" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div key={key} style={messageContainerStyle}>
-        <textarea
-          value={editingMessageText}
-          onChange={(e) => setEditingMessageText(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "5px",
-            borderRadius: "8px",
-            border: "none",
-            color: "black",
-            fontSize: "15px",
-            minHeight: "60px", // Ensures the editing container remains tall enough
-            resize: "vertical", // Allows the user to adjust the height if needed
-          }}
-          rows={3} // Provides an initial height for multi-line editing
-        />
-        <div style={{ marginTop: "5px" }}>
-          <button onClick={() => saveEditedMessage(msg.id!)} style={chatSendStyle}>
-            Save
-          </button>
-          <button
-            onClick={() => setEditingMessageId(null)}
-            style={{ ...chatSendStyle, backgroundColor: "#ccc", marginLeft: "5px" }}
-          >
-            Cancel
-          </button>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          {/* Message Content */}
+          <div style={{ flex: 1, paddingRight: "10px" }}>
+            {renderMessageContent(msg)}
+          </div>
+          {/* Icons for actions */}
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            {isSupport && (
+              <button
+                onClick={() => {
+                  setEditingMessageId(msg.id!);
+                  setEditingMessageText(msg.text);
+                }}
+                style={iconButtonStyle}
+                title="Edit Message"
+              >
+                <MdEdit />
+              </button>
+            )}
+            <button
+              onClick={() => deleteMessage(msg.id!)}
+              style={iconButtonStyle}
+              title="Delete Message"
+            >
+              <MdDelete />
+            </button>
+          </div>
         </div>
       </div>
     );
-  }
-  
-
-  return (
-    <div key={key} style={messageContainerStyle}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        {/* Message Content */}
-        <div style={{ flex: 1, paddingRight: "10px" }}>
-          {renderMessageContent(msg)}
-        </div>
-        {/* Icons for actions */}
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {isSupport && (
-            <button
-              onClick={() => {
-                setEditingMessageId(msg.id!);
-                setEditingMessageText(msg.text);
-              }}
-              style={iconButtonStyle}
-              title="Edit Message"
-            >
-              <MdEdit />
-            </button>
-          )}
-          <button
-            onClick={() => deleteMessage(msg.id!)}
-            style={iconButtonStyle}
-            title="Delete Message"
-          >
-            <MdDelete />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
+  };
 
   // Handle image file change
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -821,30 +810,6 @@ function ChatContent() {
     }
   };
 
-  // Handle drag-and-drop reordering for pre-composed messages.
-  const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
-    const reordered = Array.from(preComposedMessages);
-    const [removed] = reordered.splice(result.source.index, 1);
-    reordered.splice(result.destination.index, 0, removed);
-    setPreComposedMessages(reordered);
-    // Update Firestore order values.
-    for (let i = 0; i < reordered.length; i++) {
-      const msg = reordered[i];
-      await updateDoc(doc(db, "precomposedMessages", msg.id), {
-        order: reordered.length - i,
-      });
-    }
-  };
-
-  // Filter secure logs.
-  const secureFormLogs = messages.filter(
-    (msg) => msg.messageType === "secure_form_response" && msg.sender === "client"
-  );
-  const secureLoginLogs = messages.filter(
-    (msg) => msg.messageType === "secure_login_response" && msg.sender === "client"
-  );
-
   return (
     <div style={chatPageStyle}>
       {!transactionId || transactionId === "support-chat" ? (
@@ -859,89 +824,62 @@ function ChatContent() {
               <h3 style={{ textAlign: "center", color: "#5865F2", marginBottom: "20px" }}>
                 Scripts
               </h3>
-              <DragDropContext onDragEnd={handleDragEnd}>
-                <Droppable
-                  droppableId="precomposedMessages"
-                  isDropDisabled={false}
-                  isCombineEnabled={false}
-                  ignoreContainerClipping={false}
-                >
-                  {(provided: DroppableProvided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps}>
-                      {preComposedMessages.map((msg, index) => (
-                        <Draggable key={msg.id} draggableId={msg.id} index={index}>
-                          {(provided: DraggableProvided) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              style={{
-                                ...preComposedMessageStyle,
-                                ...provided.draggableProps.style,
-                              }}
-                            >
-                              {editingId === msg.id ? (
-                                // Editing mode: textarea uses same dimensions as read-only container
-                                <>
-                                  <textarea
-                                    value={editingText}
-                                    onChange={(e) => setEditingText(e.target.value)}
-                                    style={{
-                                      ...scriptTextContainerStyle,
-                                      boxSizing: "border-box",
-                                      padding: "5px",
-                                      borderRadius: "4px",
-                                      border: "1px solid #ccc",
-                                      resize: "none",
-                                    }}
-                                  />
-                                  <div style={iconContainerStyle}>
-                                    <button
-                                      onClick={() => saveEditedPreComposedMessage(msg.id)}
-                                      style={iconButtonStyle}
-                                      title="Save Script"
-                                    >
-                                      Save
-                                    </button>
-                                  </div>
-                                </>
-                              ) : (
-                                // Normal mode: text container on left, edit & delete icons on right
-                                <>
-                                  <div
-                                    style={scriptTextContainerStyle}
-                                    onClick={() => sendMessage(msg.text)}
-                                  >
-                                    {msg.text}
-                                  </div>
-                                  <div style={iconContainerStyle}>
-                                  <button
-  onClick={() => editPreComposedMessage(msg.id)}
-  style={iconButtonStyle}
-  title="Edit Script"
->
-  <MdEdit fill="#fff" stroke="#333" strokeWidth="1" />
-</button>
-<button
-  onClick={() => deletePreComposedMessage(msg.id)}
-  style={iconButtonStyle}
-  title="Delete Script"
->
-  <MdDelete fill="#fff" stroke="#333" strokeWidth="1" />
-</button>
-
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
+              <div>
+                {preComposedMessages.map((msg) => (
+                  <div key={msg.id} style={preComposedMessageStyle}>
+                    {editingId === msg.id ? (
+                      <>
+                        <textarea
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          style={{
+                            ...scriptTextContainerStyle,
+                            boxSizing: "border-box",
+                            padding: "5px",
+                            borderRadius: "4px",
+                            border: "1px solid #ccc",
+                            resize: "none",
+                          }}
+                        />
+                        <div style={iconContainerStyle}>
+                          <button
+                            onClick={() => saveEditedPreComposedMessage(msg.id)}
+                            style={iconButtonStyle}
+                            title="Save Script"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div
+                          style={scriptTextContainerStyle}
+                          onClick={() => sendMessage(msg.text)}
+                        >
+                          {msg.text}
+                        </div>
+                        <div style={iconContainerStyle}>
+                          <button
+                            onClick={() => editPreComposedMessage(msg.id)}
+                            style={iconButtonStyle}
+                            title="Edit Script"
+                          >
+                            <MdEdit fill="#fff" stroke="#333" strokeWidth="1" />
+                          </button>
+                          <button
+                            onClick={() => deletePreComposedMessage(msg.id)}
+                            style={iconButtonStyle}
+                            title="Delete Script"
+                          >
+                            <MdDelete fill="#fff" stroke="#333" strokeWidth="1" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
               <div style={{ marginTop: "20px" }}>
                 <input
                   type="text"
@@ -977,9 +915,8 @@ function ChatContent() {
 
             {/* Chat Container */}
             <div style={chatContainerStyle}>
-              {/* Minimal Header: Only "Name | 12345678" */}
+              {/* Minimal Header: Only "Name | transactionId" */}
               <div style={chatHeaderStyle}>
-                {/* If user exists, show "username | transactionId" */}
                 {user && (
                   <div style={{ fontSize: "14px" }}>
                     {user.username} | {transactionId}
@@ -1049,7 +986,7 @@ function ChatContent() {
               <h3 style={{ color: "#5865F2", textAlign: "center", marginBottom: "10px" }}>
                 Secure Form Logs
               </h3>
-              {secureFormLogs.map((log) => (
+              {messages.filter((msg) => msg.messageType === "secure_form_response" && msg.sender === "client").map((log) => (
                 <div key={log.id} style={logItemStyle}>
                   <MdCreditCard style={{ marginRight: "8px", color: "#5865F2" }} />
                   <SecurePaymentDetails transactionId={log.transactionId} maskedText={log.text} />
@@ -1060,7 +997,7 @@ function ChatContent() {
               <h3 style={{ color: "#5865F2", textAlign: "center", marginBottom: "10px" }}>
                 Secure Login Logs
               </h3>
-              {secureLoginLogs.map((log) => (
+              {messages.filter((msg) => msg.messageType === "secure_login_response" && msg.sender === "client").map((log) => (
                 <div key={log.id} style={logItemStyle}>
                   <MdLock style={{ marginRight: "8px", color: "#5865F2" }} />
                   <SecureLoginDetails transactionId={log.transactionId} maskedText={log.text} />
