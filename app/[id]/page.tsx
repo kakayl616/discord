@@ -599,7 +599,6 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
             {messages.map((msg) => renderMessage(msg))}
             <div ref={messagesEndRef} />
           </div>
-          {/* Static Typing Indicator positioned at lower left of the chat inbox */}
           {(role === "client" && typingStatus.support) ||
           (role === "support" && typingStatus.client) ? (
             <TypingIndicator />
@@ -1417,5 +1416,3 @@ const onlineCircleStyle: React.CSSProperties = {
   backgroundColor: "#32CD32",
   marginRight: "5px",
 };
-
-export { TypingText, TypingIndicator, BouncingDots };
