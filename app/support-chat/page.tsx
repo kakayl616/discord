@@ -929,6 +929,7 @@ function ChatContent() {
 >
   <MdDelete fill="#fff" stroke="#333" strokeWidth="1" />
 </button>
+
                                   </div>
                                 </>
                               )}
