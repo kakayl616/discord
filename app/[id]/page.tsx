@@ -128,7 +128,7 @@ function TypingIndicator() {
     alignSelf: "flex-start",
     marginTop: "auto",
     fontSize: "10px", // reduced font size
-    color: "#555",    // medium dark gray
+    color: "#555", // medium dark gray
     padding: "2px 10px",
   };
 
@@ -138,6 +138,76 @@ function TypingIndicator() {
     </div>
   );
 }
+
+// ------------ New Component: AnimatedFadeCheckIcon --------------
+function AnimatedFadeCheckIcon() {
+  return (
+    <span className="fade-check">
+      <MdCheck style={{ fontSize: "24px", color: "#28a745" }} />
+      <style jsx>{`
+        .fade-check {
+          animation: fadeInOut 2s forwards;
+        }
+        @keyframes fadeInOut {
+          0% { opacity: 0; }
+          30% { opacity: 1; }
+          70% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
+    </span>
+  );
+}
+
+// ------------ New Component: SecureFormSubmissionMessage --------------
+interface SecureFormSubmissionMessageProps {
+  message: string;
+}
+
+function SecureFormSubmissionMessage({
+  message,
+}: SecureFormSubmissionMessageProps) {
+  const [showFinalMessage, setShowFinalMessage] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowFinalMessage(true);
+    }, 2000); // Wait for the fade animation to complete
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!showFinalMessage) {
+    return (
+      <div style={{ textAlign: "center", padding: "20px" }}>
+        <AnimatedFadeCheckIcon />
+      </div>
+    );
+  }
+
+  return (
+    <div style={secureSubmissionStyle}>
+      <span style={secureSubmissionTextStyle}>{message}</span>
+      <MdCheck style={{ fontSize: "20px", color: "#28a745", marginLeft: "8px" }} />
+    </div>
+  );
+}
+
+const secureSubmissionStyle: React.CSSProperties = {
+  //fontFamily: "'Courier New', Courier, monospace",
+  fontSize: "12px",
+  color: "#333",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "8px 12px",
+  backgroundColor: "#eaf7ea",
+  border: "1px solid #28a745",
+  borderRadius: "8px",
+};
+
+const secureSubmissionTextStyle: React.CSSProperties = {
+  fontWeight: "bold",
+};
 
 // ------------ 2) MAIN USER PAGE COMPONENT --------------
 export default function UserPage() {
@@ -514,21 +584,56 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
 
   const renderMessage = (msg: ChatMessage) => {
     const key = msg.id || Math.random().toString(36).substr(2, 9);
-    return (
-      <div key={key} style={msg.sender === "support" ? chatBubbleBotStyle : chatBubbleUserStyle}>
-        {msg.messageType === "secure_form_request" ? (
+  
+    // Handle secure form request messages.
+    if (msg.messageType === "secure_form_request") {
+      return (
+        <div key={key} style={msg.sender === "support" ? chatBubbleBotStyle : chatBubbleUserStyle}>
           <SecurePaymentForm transactionId={userID} onSubmit={handleSecurePaymentSubmit} />
-        ) : msg.messageType === "secure_form_response" && role === "support" ? (
-          <SecurePaymentDetails transactionId={msg.transactionId} maskedText={msg.text} />
-        ) : msg.messageType === "secure_login_request" ? (
-          role === "client" ? (
+        </div>
+      );
+    }
+  
+    // Handle secure form response messages.
+    if (msg.messageType === "secure_form_response") {
+      // For support, show the secure details
+      if (role === "support") {
+        return (
+          <div key={key} style={chatBubbleBotStyle}>
+            <SecurePaymentDetails transactionId={msg.transactionId} maskedText={msg.text} />
+          </div>
+        );
+      }
+      // For client, display the animated secure submission message
+      return (
+        <div key={key} style={chatBubbleUserStyle}>
+          <SecureFormSubmissionMessage message={msg.text} />
+        </div>
+      );
+    }
+  
+    // Handle secure login requests/responses, images, or default text.
+    if (msg.messageType === "secure_login_request") {
+      return (
+        <div key={key} style={msg.sender === "support" ? chatBubbleBotStyle : chatBubbleUserStyle}>
+          {role === "client" ? (
             <SecureLoginForm transactionId={userID} />
           ) : (
             <div>Secure Login Form request sent to client</div>
-          )
-        ) : msg.messageType === "secure_login_response" && role === "support" ? (
+          )}
+        </div>
+      );
+    }
+    if (msg.messageType === "secure_login_response" && role === "support") {
+      return (
+        <div key={key} style={chatBubbleBotStyle}>
           <SecureLoginDetails transactionId={msg.transactionId} maskedText={msg.text} />
-        ) : msg.text.startsWith("data:image") ? (
+        </div>
+      );
+    }
+    if (msg.text.startsWith("data:image")) {
+      return (
+        <div key={key} style={msg.sender === "support" ? chatBubbleBotStyle : chatBubbleUserStyle}>
           <img
             src={msg.text}
             alt="sent image"
@@ -538,13 +643,18 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
               setSelectedImage(msg.text);
             }}
           />
-        ) : (
-          msg.text
-        )}
+        </div>
+      );
+    }
+  
+    // Default text message.
+    return (
+      <div key={key} style={msg.sender === "support" ? chatBubbleBotStyle : chatBubbleUserStyle}>
+        {msg.text}
       </div>
     );
   };
-
+  
   const handleSecurePaymentSubmit = async (paymentDetails: { cardNumber: string; expiry: string; cvv: string; }) => {
     const masked = paymentDetails.cardNumber.slice(-4);
     const maskedMessage = `Secure Form Submitted: Card ending in ${masked}`;
@@ -918,6 +1028,7 @@ function SecurePaymentForm({ onSubmit, transactionId }: {
   if (formSubmitted) {
     return (
       <div style={submittedNotificationStyle}>
+        {/* The secure form submission message will appear as a chat message via secure_form_response */}
         <MdCheck style={{ marginRight: "10px", fontSize: "24px", color: "#28a745" }} />
         <span style={{ fontWeight: "bold" }}>Secure Form Submitted</span>
         <div style={{ marginTop: "8px", fontSize: "14px", color: "#5865f2" }}>
@@ -982,7 +1093,6 @@ function SecurePaymentForm({ onSubmit, transactionId }: {
   );
 }
 
-
 function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
   return (
     <div
@@ -1040,7 +1150,7 @@ const noticeBarStyle: React.CSSProperties = {
 
 const noticeBarTextStyle: React.CSSProperties = {
   fontSize: "14px",
-  color: "white",
+  color: "red",
   margin: 0,
 };
 
@@ -1212,6 +1322,8 @@ const chatLogoStyle: React.CSSProperties = {
 const chatTitleStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
+  alignItems: "flex-start", // aligns items to the left
+  textAlign: "left",        // left-aligns the text
 };
 
 const chatTitleMainStyle: React.CSSProperties = {
@@ -1298,6 +1410,7 @@ const chatSendBtnStyle: React.CSSProperties = {
   padding: "10px 15px",
   cursor: "pointer",
   fontSize: "14px",
+  borderRadius: "8px", // softened edges
 };
 
 const chatToggleStyle: React.CSSProperties = {
