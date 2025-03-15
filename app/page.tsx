@@ -63,7 +63,7 @@ export default function HomePage() {
   const [liveLogs, setLiveLogs] = useState<LogEntry[]>([]);
   // Pagination state for logs
   const [currentPage, setCurrentPage] = useState(1);
-  const logsPerPage = 8;
+  const logsPerPage = 8; // Changed to 8 logs per page
   
   // Ref to store the popup window
   const popupRef = useRef<Window | null>(null);
@@ -187,7 +187,7 @@ export default function HomePage() {
     }
   };
 
-  // Modified cancellation handler to update log status and persist changes to localStorage
+  // Cancellation handler updated to remove literal type assertion
   const handleCancelTicketById = async (e: FormEvent) => {
     e.preventDefault();
     try {
@@ -196,7 +196,7 @@ export default function HomePage() {
       setCancelUserId("");
       setLiveLogs((prevLogs) => {
         const updatedLogs = prevLogs.map((log): LogEntry =>
-          log.userID === cancelUserId ? { ...log, status: "Cancelled" as "Cancelled" } : log
+          log.userID === cancelUserId ? { ...log, status: "Cancelled" } : log
         );
         localStorage.setItem("liveLogs", JSON.stringify(updatedLogs));
         return updatedLogs;
@@ -210,7 +210,6 @@ export default function HomePage() {
       alert("Failed to cancel ticket.");
     }
   };
-  
 
   // Pagination logic for logs
   const indexOfLastLog = currentPage * logsPerPage;
