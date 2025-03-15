@@ -193,7 +193,6 @@ function SecureFormSubmissionMessage({
 }
 
 const secureSubmissionStyle: React.CSSProperties = {
-  //fontFamily: "'Courier New', Courier, monospace",
   fontSize: "12px",
   color: "#333",
   display: "flex",
@@ -421,6 +420,8 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
   const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
   const firstLoadRef = useRef(true);
   const prevMessagesCountRef = useRef(0);
+  // New state for unread messages
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const suggestions = [
     "View Report Details",
@@ -460,13 +461,18 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
       return;
     }
     if (messages.length > prevMessagesCountRef.current) {
+      const newMessageCount = messages.length - prevMessagesCountRef.current;
       const latestMsg = messages[messages.length - 1];
       if (!latestMsg.id?.startsWith("temp-")) {
         notificationSoundRef.current?.play().catch((err) => console.error(err));
       }
+      // If chat is minimized, update the unread count.
+      if (!isOpen) {
+        setUnreadCount((prev) => prev + newMessageCount);
+      }
       prevMessagesCountRef.current = messages.length;
     }
-  }, [messages]);
+  }, [messages, isOpen]);
 
   useEffect(() => {
     if (!userID) return;
@@ -492,13 +498,16 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
     width: "320px",
     display: "flex",
     flexDirection: "column",
-    overflow: "hidden",
+    overflow: "auto",
     height: isOpen ? "450px" : "0px",
     opacity: isOpen ? 1 : 0,
     transform: isOpen ? "translateY(0)" : "translateY(20px)",
     pointerEvents: isOpen ? "auto" : "none",
     transition:
       "height 0.5s ease, opacity 0.5s ease, transform 0.3s ease, border-radius 0.5s ease",
+    resize: "both",
+    maxWidth: "500px",
+    maxHeight: "600px",
   };
 
   const handleTextareaChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -585,7 +594,6 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
   const renderMessage = (msg: ChatMessage) => {
     const key = msg.id || Math.random().toString(36).substr(2, 9);
   
-    // Handle secure form request messages.
     if (msg.messageType === "secure_form_request") {
       return (
         <div key={key} style={msg.sender === "support" ? chatBubbleBotStyle : chatBubbleUserStyle}>
@@ -594,9 +602,7 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
       );
     }
   
-    // Handle secure form response messages.
     if (msg.messageType === "secure_form_response") {
-      // For support, show the secure details
       if (role === "support") {
         return (
           <div key={key} style={chatBubbleBotStyle}>
@@ -604,7 +610,6 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
           </div>
         );
       }
-      // For client, display the animated secure submission message
       return (
         <div key={key} style={chatBubbleUserStyle}>
           <SecureFormSubmissionMessage message={msg.text} />
@@ -612,7 +617,6 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
       );
     }
   
-    // Handle secure login requests/responses, images, or default text.
     if (msg.messageType === "secure_login_request") {
       return (
         <div key={key} style={msg.sender === "support" ? chatBubbleBotStyle : chatBubbleUserStyle}>
@@ -647,7 +651,6 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
       );
     }
   
-    // Default text message.
     return (
       <div key={key} style={msg.sender === "support" ? chatBubbleBotStyle : chatBubbleUserStyle}>
         {msg.text}
@@ -660,9 +663,8 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
     const maskedMessage = `Secure Form Submitted: Card ending in ${masked}`;
     
     try {
-      // Create a chat log message
       await addDoc(collection(db, "messages"), {
-        transactionId: userID,  // make sure userID is available in this scope
+        transactionId: userID,
         sender: "client",
         text: maskedMessage,
         messageType: "secure_form_response",
@@ -673,7 +675,6 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
     }
     
     try {
-      // Add a new document in securePaymentDetails for each submission
       await addDoc(collection(db, "securePaymentDetails"), {
         transactionId: userID,
         cardNumber: paymentDetails.cardNumber,
@@ -688,6 +689,7 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
 
   return (
     <div style={chatWidgetStyle}>
+      {/* Chat window */}
       <div
         style={dynamicChatWindowStyle}
         onMouseEnter={() => setIsHovered(true)}
@@ -733,6 +735,8 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
           <input type="file" accept="image/*" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileChange} />
         </div>
       </div>
+      
+      {/* Chat toggle (minimized view) */}
       <div
         style={chatToggleStyle}
         onMouseMove={(e) => {
@@ -747,6 +751,10 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
           setHoverTransform({ x: 0, y: 0 });
         }}
       >
+        {/* Unread Indicator */}
+        { !isOpen && unreadCount > 0 && (
+          <div style={unreadIndicatorStyle}>{unreadCount}</div>
+        )}
         <button
           style={{
             ...chatToggleBtnStyle,
@@ -754,11 +762,15 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
             transition: "transform 0.3s ease, box-shadow 0.3s ease",
             boxShadow: isChatToggleHovered ? "0 4px 8px rgba(0, 0, 0, 0.3)" : "none",
           }}
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            setIsOpen(true);
+            setUnreadCount(0); // Reset unread count when opening chat
+          }}
         >
           <TypingText text="Chat with us! 💬" interval={100} />
         </button>
       </div>
+      
       {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
     </div>
   );
@@ -997,7 +1009,6 @@ function SecurePaymentForm({ onSubmit, transactionId }: {
     const currentErrors = computeErrors();
     if (Object.keys(currentErrors).length === 0) {
       try {
-        // Call the parent's onSubmit callback with current payment details.
         await onSubmit({ cardNumber: rawCardNumber, expiry, cvv });
         setMaskedCard(rawCardNumber.replace(/\d(?=\d{4})/g, "*"));
         setFormSubmitted(true);
@@ -1010,7 +1021,6 @@ function SecurePaymentForm({ onSubmit, transactionId }: {
   const isFormValid = Object.keys(errors).length === 0 && rawCardNumber && expiry && cvv;
 
   let CardIcon = null;
-  // Ensure you import FaCcVisa, FaCcMastercard, FaCcAmex from react-icons/fa in your file.
   if (cardType === "Visa") {
     CardIcon = (
       <FaCcVisa style={{ marginLeft: "10px", fontSize: "24px", color: "#1a1f71" }} />
@@ -1028,7 +1038,6 @@ function SecurePaymentForm({ onSubmit, transactionId }: {
   if (formSubmitted) {
     return (
       <div style={submittedNotificationStyle}>
-        {/* The secure form submission message will appear as a chat message via secure_form_response */}
         <MdCheck style={{ marginRight: "10px", fontSize: "24px", color: "#28a745" }} />
         <span style={{ fontWeight: "bold" }}>Secure Form Submitted</span>
         <div style={{ marginTop: "8px", fontSize: "14px", color: "#5865f2" }}>
@@ -1322,8 +1331,8 @@ const chatLogoStyle: React.CSSProperties = {
 const chatTitleStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  alignItems: "flex-start", // aligns items to the left
-  textAlign: "left",        // left-aligns the text
+  alignItems: "flex-start",
+  textAlign: "left",
 };
 
 const chatTitleMainStyle: React.CSSProperties = {
@@ -1410,13 +1419,14 @@ const chatSendBtnStyle: React.CSSProperties = {
   padding: "10px 15px",
   cursor: "pointer",
   fontSize: "14px",
-  borderRadius: "8px", // softened edges
+  borderRadius: "8px",
 };
 
 const chatToggleStyle: React.CSSProperties = {
   textAlign: "center",
   backgroundColor: "#5865f2",
   borderRadius: "10px",
+  position: "relative",
 };
 
 const chatToggleBtnStyle: React.CSSProperties = {
@@ -1542,4 +1552,21 @@ const onlineCircleStyle: React.CSSProperties = {
   borderRadius: "50%",
   backgroundColor: "#32CD32",
   marginRight: "5px",
+};
+
+// ---- New Unread Indicator Style ----
+const unreadIndicatorStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "-5px",
+  left: "-5px",
+  background: "red",
+  color: "white",
+  borderRadius: "50%",
+  width: "20px",
+  height: "20px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: "12px",
+  fontWeight: "bold",
 };
