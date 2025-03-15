@@ -8,10 +8,9 @@
     "outDir": "lib",
     "sourceMap": true,
     "strict": true,
-    "target": "es2017"
+    "target": "es2017",
+    "typeRoots": ["./types", "./node_modules/@types"]
   },
-  "compileOnSave": true,
-  "include": [
-    "src"
-  ]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }

